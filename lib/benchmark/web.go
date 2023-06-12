@@ -77,25 +77,25 @@ func (s WebSSHBenchmark) BenchBuilder(ctx context.Context, tc *client.TeleportCl
 			return nil, trace.BadParameter("random ssh bench commands must use the format <user>@all <command>")
 		}
 
-		servers, err := s.getServers(ctx, tc)
+		servers, err := getServers(ctx, tc)
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
 
 		return func(ctx context.Context) error {
-			return trace.Wrap(s.runCommand(ctx, tc, webSess, chooseRandomHost(servers), command))
+			return trace.Wrap(runCommand(ctx, tc, webSess, chooseRandomHost(servers), command))
 		}, nil
 	}
 
 	return func(ctx context.Context) error {
-		return trace.Wrap(s.runCommand(ctx, tc, webSess, tc.Host, command))
+		return trace.Wrap(runCommand(ctx, tc, webSess, tc.Host, command))
 	}, nil
 }
 
 // runCommand starts a non-interactive SSH session and executes the provided
 // command before terminating the session.
-func (s WebSSHBenchmark) runCommand(ctx context.Context, tc *client.TeleportClient, webSess *webSession, host, command string) error {
-	stream, err := s.connectToHost(ctx, tc, webSess, host)
+func runCommand(ctx context.Context, tc *client.TeleportClient, webSess *webSession, host, command string) error {
+	stream, err := connectToHost(ctx, tc, webSess, host)
 	if err != nil {
 		return trace.Wrap(err)
 	}
@@ -114,7 +114,7 @@ func (s WebSSHBenchmark) runCommand(ctx context.Context, tc *client.TeleportClie
 
 // getServers returns all [types.Server] that the authenticated user has
 // access to.
-func (s WebSSHBenchmark) getServers(ctx context.Context, tc *client.TeleportClient) ([]types.Server, error) {
+func getServers(ctx context.Context, tc *client.TeleportClient) ([]types.Server, error) {
 	clt, err := tc.ConnectToCluster(ctx)
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -134,7 +134,7 @@ func (s WebSSHBenchmark) getServers(ctx context.Context, tc *client.TeleportClie
 }
 
 // connectToHost opens an SSH session to the target host via the Proxy web api.
-func (s WebSSHBenchmark) connectToHost(ctx context.Context, tc *client.TeleportClient, webSession *webSession, host string) (*web.TerminalStream, error) {
+func connectToHost(ctx context.Context, tc *client.TeleportClient, webSession *webSession, host string) (*web.TerminalStream, error) {
 	req := web.TerminalRequest{
 		Server: host,
 		Login:  tc.HostLogin,
@@ -233,4 +233,174 @@ func (s *webSession) getToken() string {
 	defer s.mu.Unlock()
 
 	return s.webSession.GetBearerToken()
+}
+
+// WebSessionBenchmark is a benchmark suite that connects to the configured
+// target hosts via the web api and executes the provided command.
+type WebSessionBenchmark struct {
+	// Command to execute on the host.
+	Command []string
+	// Max number of sessions to have open at once.
+	Max int
+	// Duration of the test used to determine if renewing web sessions
+	// is necessary.
+	Duration time.Duration
+
+	servers []types.Server
+}
+
+func (s *WebSessionBenchmark) Config(ctx context.Context, tc *client.TeleportClient, cfg *Config) error {
+	servers, err := getServers(ctx, tc)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+
+	s.servers = servers
+
+	if s.Max == 0 {
+		s.Max = len(servers)
+	}
+
+	// alter the minimum window such that the test will run
+	// for as long as is required to spawn all the sessions plus
+	// an additional minute.
+	interval := time.Duration(1 / float64(cfg.Rate) * float64(time.Second))
+	window := interval*time.Duration(s.Max) + (time.Minute)
+	if cfg.MinimumWindow < window {
+		cfg.MinimumWindow = window
+	}
+
+	return nil
+}
+
+// BenchBuilder returns a WorkloadFunc for the given benchmark suite.
+func (s *WebSessionBenchmark) BenchBuilder(ctx context.Context, tc *client.TeleportClient) (WorkloadFunc, error) {
+	clt, sess, err := tc.LoginWeb(ctx)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	webSess := &webSession{
+		webSession: sess,
+		clt:        clt,
+	}
+
+	// The web session will expire before the duration of the test
+	// so launch the renewal loop.
+	if !time.Now().Add(s.Duration).Before(webSess.expires()) {
+		go webSess.renew(ctx)
+	}
+
+	var (
+		mu     sync.Mutex
+		active int
+		next   int
+	)
+
+	// Open a ssh session to the next host if the maximum
+	// number of connections has not already been reached.
+	return func(ctx context.Context) error {
+		mu.Lock()
+		if active >= s.Max {
+			mu.Unlock()
+			return nil
+		}
+		active++
+
+		current := next
+		next = (next + 1) % len(s.servers)
+		mu.Unlock()
+
+		defer func() {
+			mu.Lock()
+			active--
+			mu.Unlock()
+		}()
+
+		stream, err := connectToHost(ctx, tc, webSess, s.servers[current].GetName()+":0")
+		if err != nil {
+			return trace.Wrap(err)
+		}
+
+		return trace.Wrap(utils.ProxyConn(ctx,
+			&streamCloser{
+				TerminalStream: stream,
+			},
+			rwc{
+				r: repeatingReader{
+					ctx:      ctx,
+					s:        strings.Join(append(s.Command, "\r\n"), " "),
+					interval: time.Second,
+				},
+				w: tc.Stdout,
+				c: io.NopCloser(stream),
+			}))
+	}, nil
+}
+
+// streamCloser allows the client to end the
+// session by sending "exit" to the server. This
+// allows all sessions initiated by the benchmark to
+// disappear immediately instead of having them linger
+// until the session tracker is expired.
+type streamCloser struct {
+	*web.TerminalStream
+	once sync.Once
+}
+
+func (s *streamCloser) Close() error {
+	var err error
+	s.once.Do(func() {
+		_, exitErr := s.TerminalStream.Write([]byte("\r\nexit\r\n"))
+		err = trace.NewAggregate(exitErr, s.TerminalStream.Close())
+	})
+
+	return trace.Wrap(err)
+}
+
+type rwc struct {
+	r io.Reader
+	w io.Writer
+	c io.Closer
+}
+
+func (r rwc) Read(p []byte) (int, error) {
+	return r.r.Read(p)
+}
+
+func (r rwc) Write(p []byte) (int, error) {
+	return r.w.Write(p)
+}
+
+func (r rwc) Close() error {
+	return r.c.Close()
+}
+
+// repeatingReader is an [io.Reader] that periodically
+// returns the same value until the context is
+// terminated.
+type repeatingReader struct {
+	ctx      context.Context
+	s        string
+	interval time.Duration
+}
+
+func (r repeatingReader) Read(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+
+	select {
+	case <-r.ctx.Done():
+		return 0, io.EOF
+	case <-time.After(r.interval):
+	}
+
+	end := len(r.s)
+	if end > len(p) {
+		end = len(p)
+	}
+
+	n := copy(p, r.s[:end])
+	return n, nil
 }
