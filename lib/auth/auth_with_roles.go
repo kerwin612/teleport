@@ -1667,7 +1667,7 @@ func (a *ServerWithRoles) ListResources(ctx context.Context, req proto.ListResou
 		//   https://github.com/gravitational/teleport/pull/1224
 		actionVerbs = []string{types.VerbList}
 
-	case types.KindDatabaseServer, types.KindDatabaseService, types.KindAppServer, types.KindKubeServer, types.KindWindowsDesktop, types.KindWindowsDesktopService, types.KindUserGroup:
+	case types.KindDatabaseServer, types.KindDatabaseService, types.KindAppServer, types.KindKubeServer, types.KindWindowsDesktop, types.KindWindowsDesktopService, types.KindUserGroup, types.KindAppAndIdPServiceProvider:
 
 	default:
 		return nil, trace.NotImplemented("resource type %s does not support pagination", req.ResourceType)
@@ -1765,6 +1765,8 @@ func (r resourceChecker) CanAccess(resource types.Resource) error {
 		return r.CheckAccess(rr, state)
 	case types.WindowsDesktopService:
 		return r.CheckAccess(rr, state)
+	case types.SAMLIdPServiceProvider:
+		return r.CheckAccess(rr, state)
 	case types.UserGroup:
 		// Because usergroup only has ResourceWithLabels, it looks like this will match
 		// everything. To get around this, we'll match on it last and then double check
@@ -1820,6 +1822,20 @@ func (a *ServerWithRoles) listResourcesWithSort(ctx context.Context, req proto.L
 			return nil, trace.Wrap(err)
 		}
 		resources = servers.AsResources()
+
+	case types.KindAppAndIdPServiceProvider:
+		appsAndServiceProviders, err := a.GetAppServersAndSAMLIdPServiceProviders(ctx, req.Namespace)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+
+		appsOrSPs := types.AppServersOrSAMLIdPServiceProviders(appsAndServiceProviders)
+
+		if err := appsOrSPs.SortByCustom(req.SortBy); err != nil {
+			return nil, trace.Wrap(err)
+		}
+
+		resources = appsOrSPs.AsResources()
 
 	case types.KindDatabaseServer:
 		dbservers, err := a.GetDatabaseServers(ctx, req.Namespace)
@@ -4631,6 +4647,48 @@ func (a *ServerWithRoles) GetApplicationServers(ctx context.Context, namespace s
 		}
 	}
 	return filtered, nil
+}
+
+// GetAppServersAndSAMLIdPServiceProviders returns a list containing all registered AppServers and SAMLIdPServiceProviders.
+func (a *ServerWithRoles) GetAppServersAndSAMLIdPServiceProviders(ctx context.Context, namespace string) ([]types.AppServerOrSAMLIdPServiceProvider, error) {
+	if err := a.action(namespace, types.KindSAMLIdPServiceProvider, types.VerbList, types.VerbRead); err != nil {
+		return nil, trace.Wrap(err)
+	}
+	if err := a.action(namespace, types.KindAppServer, types.VerbList, types.VerbRead); err != nil {
+		return nil, trace.Wrap(err)
+	}
+	appservers, err := a.authServer.GetApplicationServers(ctx, namespace)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	var appAndSPs []types.AppServerOrSAMLIdPServiceProvider
+	// Add apps to the list, filtering out apps the caller doesn't have access to.
+	for _, appserver := range appservers {
+		err := a.checkAccessToApp(appserver.GetApp())
+		if err != nil && !trace.IsAccessDenied(err) {
+			return nil, trace.Wrap(err)
+		} else if err == nil {
+			appServerV3 := appserver.(*types.AppServerV3)
+			appAndSP := &types.AppServerOrSAMLIdPServiceProviderV1{AppServerOrSP: &types.AppServerOrSAMLIdPServiceProviderV1_AppServer{AppServer: appServerV3}}
+			appAndSPs = append(appAndSPs, appAndSP)
+		}
+	}
+
+	// Only add SAMLIdPServiceProviders to the list if the caller has an enterprise license since this is an enteprise-only feature.
+	if modules.GetModules().BuildType() == modules.BuildEnterprise {
+		serviceProviders, _, err := a.authServer.ListSAMLIdPServiceProviders(ctx, 10000, "")
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		for _, sp := range serviceProviders {
+			spV1 := sp.(*types.SAMLIdPServiceProviderV1)
+			appAndSP := &types.AppServerOrSAMLIdPServiceProviderV1{AppServerOrSP: &types.AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider{SAMLIdPServiceProvider: spV1}}
+			appAndSPs = append(appAndSPs, appAndSP)
+		}
+	}
+
+	return appAndSPs, nil
 }
 
 // UpsertApplicationServer registers an application server.

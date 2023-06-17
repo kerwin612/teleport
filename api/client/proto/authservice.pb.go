@@ -10803,6 +10803,7 @@ type PaginatedResource struct {
 	//	*PaginatedResource_WindowsDesktopService
 	//	*PaginatedResource_DatabaseService
 	//	*PaginatedResource_UserGroup
+	//	*PaginatedResource_AppServerOrSAMLIdPServiceProvider
 	Resource             isPaginatedResource_Resource `protobuf_oneof:"resource"`
 	XXX_NoUnkeyedLiteral struct{}                     `json:"-"`
 	XXX_unrecognized     []byte                       `json:"-"`
@@ -10875,16 +10876,20 @@ type PaginatedResource_DatabaseService struct {
 type PaginatedResource_UserGroup struct {
 	UserGroup *types.UserGroupV1 `protobuf:"bytes,10,opt,name=UserGroup,proto3,oneof" json:"user_group,omitempty"`
 }
+type PaginatedResource_AppServerOrSAMLIdPServiceProvider struct {
+	AppServerOrSAMLIdPServiceProvider *types.AppServerOrSAMLIdPServiceProviderV1 `protobuf:"bytes,11,opt,name=AppServerOrSAMLIdPServiceProvider,proto3,oneof" json:"AppServerOrSAMLIdPServiceProvider,omitempty"`
+}
 
-func (*PaginatedResource_DatabaseServer) isPaginatedResource_Resource()        {}
-func (*PaginatedResource_AppServer) isPaginatedResource_Resource()             {}
-func (*PaginatedResource_Node) isPaginatedResource_Resource()                  {}
-func (*PaginatedResource_WindowsDesktop) isPaginatedResource_Resource()        {}
-func (*PaginatedResource_KubeCluster) isPaginatedResource_Resource()           {}
-func (*PaginatedResource_KubernetesServer) isPaginatedResource_Resource()      {}
-func (*PaginatedResource_WindowsDesktopService) isPaginatedResource_Resource() {}
-func (*PaginatedResource_DatabaseService) isPaginatedResource_Resource()       {}
-func (*PaginatedResource_UserGroup) isPaginatedResource_Resource()             {}
+func (*PaginatedResource_DatabaseServer) isPaginatedResource_Resource()                    {}
+func (*PaginatedResource_AppServer) isPaginatedResource_Resource()                         {}
+func (*PaginatedResource_Node) isPaginatedResource_Resource()                              {}
+func (*PaginatedResource_WindowsDesktop) isPaginatedResource_Resource()                    {}
+func (*PaginatedResource_KubeCluster) isPaginatedResource_Resource()                       {}
+func (*PaginatedResource_KubernetesServer) isPaginatedResource_Resource()                  {}
+func (*PaginatedResource_WindowsDesktopService) isPaginatedResource_Resource()             {}
+func (*PaginatedResource_DatabaseService) isPaginatedResource_Resource()                   {}
+func (*PaginatedResource_UserGroup) isPaginatedResource_Resource()                         {}
+func (*PaginatedResource_AppServerOrSAMLIdPServiceProvider) isPaginatedResource_Resource() {}
 
 func (m *PaginatedResource) GetResource() isPaginatedResource_Resource {
 	if m != nil {
@@ -10956,6 +10961,13 @@ func (m *PaginatedResource) GetUserGroup() *types.UserGroupV1 {
 	return nil
 }
 
+func (m *PaginatedResource) GetAppServerOrSAMLIdPServiceProvider() *types.AppServerOrSAMLIdPServiceProviderV1 {
+	if x, ok := m.GetResource().(*PaginatedResource_AppServerOrSAMLIdPServiceProvider); ok {
+		return x.AppServerOrSAMLIdPServiceProvider
+	}
+	return nil
+}
+
 // XXX_OneofWrappers is for the internal use of the proto package.
 func (*PaginatedResource) XXX_OneofWrappers() []interface{} {
 	return []interface{}{
@@ -10968,6 +10980,7 @@ func (*PaginatedResource) XXX_OneofWrappers() []interface{} {
 		(*PaginatedResource_WindowsDesktopService)(nil),
 		(*PaginatedResource_DatabaseService)(nil),
 		(*PaginatedResource_UserGroup)(nil),
+		(*PaginatedResource_AppServerOrSAMLIdPServiceProvider)(nil),
 	}
 }
 
@@ -34323,6 +34336,27 @@ func (m *PaginatedResource_UserGroup) MarshalToSizedBuffer(dAtA []byte) (int, er
 	}
 	return len(dAtA) - i, nil
 }
+func (m *PaginatedResource_AppServerOrSAMLIdPServiceProvider) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PaginatedResource_AppServerOrSAMLIdPServiceProvider) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	if m.AppServerOrSAMLIdPServiceProvider != nil {
+		{
+			size, err := m.AppServerOrSAMLIdPServiceProvider.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintAuthservice(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x5a
+	}
+	return len(dAtA) - i, nil
+}
 func (m *ListResourcesRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -41232,6 +41266,18 @@ func (m *PaginatedResource_UserGroup) Size() (n int) {
 	_ = l
 	if m.UserGroup != nil {
 		l = m.UserGroup.Size()
+		n += 1 + l + sovAuthservice(uint64(l))
+	}
+	return n
+}
+func (m *PaginatedResource_AppServerOrSAMLIdPServiceProvider) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.AppServerOrSAMLIdPServiceProvider != nil {
+		l = m.AppServerOrSAMLIdPServiceProvider.Size()
 		n += 1 + l + sovAuthservice(uint64(l))
 	}
 	return n
@@ -62804,6 +62850,41 @@ func (m *PaginatedResource) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			m.Resource = &PaginatedResource_UserGroup{v}
+			iNdEx = postIndex
+		case 11:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AppServerOrSAMLIdPServiceProvider", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAuthservice
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthAuthservice
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthAuthservice
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &types.AppServerOrSAMLIdPServiceProviderV1{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.Resource = &PaginatedResource_AppServerOrSAMLIdPServiceProvider{v}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
