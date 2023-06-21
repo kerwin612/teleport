@@ -1692,6 +1692,7 @@ func (h *Handler) installer(w http.ResponseWriter, r *http.Request, p httprouter
 	}
 	// semver parsing requires a 'v' at the beginning of the version string.
 	version := semver.Major("v" + ping.ServerVersion)
+	version = "v13" // DEBUG: remove before committing!
 	instTmpl, err := template.New("").Parse(installer.GetScript())
 	if err != nil {
 		return nil, trace.Wrap(err)
