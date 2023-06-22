@@ -39,10 +39,13 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/gravitational/teleport"
+	clientproto "github.com/gravitational/teleport/api/client/proto"
 	apidefaults "github.com/gravitational/teleport/api/defaults"
 	"github.com/gravitational/teleport/api/gen/proto/go/assist/v1"
+	usageeventsv1 "github.com/gravitational/teleport/api/gen/proto/go/usageevents/v1"
 	"github.com/gravitational/teleport/api/observability/tracing"
 	"github.com/gravitational/teleport/lib/agentless"
+	"github.com/gravitational/teleport/lib/ai/model"
 	assistlib "github.com/gravitational/teleport/lib/assist"
 	"github.com/gravitational/teleport/lib/auth"
 	"github.com/gravitational/teleport/lib/client"
@@ -287,9 +290,12 @@ func (h *Handler) executeCommand(
 
 	runCommands(hosts, runCmd, int(netConfig.GetAssistCommandExecutionWorkers()), h.log)
 
+	usedTokens := model.NewTokensUsed_Cl100kBase()
+
 	// Optionally, try to compute the command summary.
 	if output, valid := buffer.Export(); valid {
 		summaryReq := summaryRequest{
+			TokensUsed:     usedTokens,
 			hosts:          hosts,
 			output:         output,
 			authClient:     clt,
@@ -298,16 +304,34 @@ func (h *Handler) executeCommand(
 			conversationID: req.ConversationID,
 			command:        req.Command,
 		}
-		err := h.computeAndSendSummary(ctx, &summaryReq, ws)
+		err = h.computeAndSendSummary(ctx, &summaryReq, ws)
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
+	}
+
+	usageEventReq := &clientproto.SubmitUsageEventRequest{
+		Event: &usageeventsv1.UsageEventOneOf{
+			Event: &usageeventsv1.UsageEventOneOf_AssistExecution{
+				AssistExecution: &usageeventsv1.AssistExecutionEvent{
+					ConversationId:   req.ConversationID,
+					NodeCount:        int64(len(hosts)),
+					TotalTokens:      int64(usedTokens.Completion + usedTokens.Prompt),
+					PromptTokens:     int64(usedTokens.Prompt),
+					CompletionTokens: int64(usedTokens.Completion),
+				},
+			},
+		},
+	}
+	if err := clt.SubmitUsageEvent(ctx, usageEventReq); err != nil {
+		h.log.WithError(err).Warn("Failed to emit usage event")
 	}
 
 	return nil, nil
 }
 
 type summaryRequest struct {
+	*model.TokensUsed
 	hosts          []hostInfo
 	output         map[string][]byte
 	authClient     auth.ClientI
@@ -338,7 +362,7 @@ func (h *Handler) computeAndSendSummary(
 		return trace.Wrap(err)
 	}
 
-	summary, err := assistClient.GenerateCommandSummary(ctx, history.GetMessages(), namedOutput)
+	summary, err := assistClient.GenerateCommandSummary(ctx, history.GetMessages(), namedOutput, req.TokensUsed)
 	if err != nil {
 		return trace.Wrap(err)
 	}

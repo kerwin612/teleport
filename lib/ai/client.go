@@ -84,7 +84,7 @@ func (client *Client) Summary(ctx context.Context, message string) (string, erro
 // CommandSummary creates a command summary based on the command output.
 // The message history is also passed to the model in order to keep context
 // and extract relevant information from the output.
-func (client *Client) CommandSummary(ctx context.Context, messages []openai.ChatCompletionMessage, output map[string][]byte) (string, error) {
+func (client *Client) CommandSummary(ctx context.Context, messages []openai.ChatCompletionMessage, output map[string][]byte, usedTokens *model.TokensUsed) (string, error) {
 	messages = append(messages, openai.ChatCompletionMessage{
 		Role: openai.ChatMessageRoleUser, Content: model.ConversationCommandResult(output)})
 
@@ -100,7 +100,10 @@ func (client *Client) CommandSummary(ctx context.Context, messages []openai.Chat
 		return "", trace.Wrap(err)
 	}
 
-	return resp.Choices[0].Message.Content, nil
+	completion := resp.Choices[0].Message.Content
+
+	err = usedTokens.AddTokens(messages, completion)
+	return completion, trace.Wrap(err)
 }
 
 // ClassifyMessage takes a user message, a list of categories, and uses the AI mode as a zero shot classifier.

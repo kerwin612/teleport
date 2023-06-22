@@ -137,7 +137,7 @@ func TestClassifyMessage(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	cfg := openai.DefaultConfig("secret-test-token")
-	cfg.BaseURL = server.URL
+	cfg.BaseURL = server.URL + "/v1"
 
 	// And a chat client.
 	ctx := context.Background()

@@ -102,7 +102,7 @@ func (a *Agent) PlanAndExecute(ctx context.Context, llm *openai.Client, chatHist
 	iterations := 0
 	start := time.Now()
 	tookTooLong := func() bool { return iterations > maxIterations || time.Since(start) > maxElapsedTime }
-	tokensUsed := newTokensUsed_Cl100kBase()
+	tokensUsed := NewTokensUsed_Cl100kBase()
 	state := &executionState{
 		llm:               llm,
 		chatHistory:       chatHistory,
@@ -221,7 +221,7 @@ func (a *Agent) takeNextStep(ctx context.Context, state *executionState, progres
 		}
 
 		completion := &CompletionCommand{
-			TokensUsed: newTokensUsed_Cl100kBase(),
+			TokensUsed: NewTokensUsed_Cl100kBase(),
 			Command:    input.Command,
 			Nodes:      input.Nodes,
 			Labels:     input.Labels,
@@ -373,13 +373,13 @@ func parsePlanningOutput(deltas <-chan string) (*AgentAction, *agentFinish, erro
 				}
 			}()
 
-			return nil, &agentFinish{output: &StreamingMessage{Parts: parts, TokensUsed: newTokensUsed_Cl100kBase()}}, nil
+			return nil, &agentFinish{output: &StreamingMessage{Parts: parts, TokensUsed: NewTokensUsed_Cl100kBase()}}, nil
 		}
 	}
 
 	log.Tracef("received planning output: \"%v\"", text)
 	if outputString, found := strings.CutPrefix(text, finalResponseHeader); found {
-		return nil, &agentFinish{output: &Message{Content: outputString, TokensUsed: newTokensUsed_Cl100kBase()}}, nil
+		return nil, &agentFinish{output: &Message{Content: outputString, TokensUsed: NewTokensUsed_Cl100kBase()}}, nil
 	}
 
 	response, err := parseJSONFromModel[PlanOutput](text)
