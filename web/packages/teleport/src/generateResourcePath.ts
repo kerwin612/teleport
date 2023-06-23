@@ -48,6 +48,5 @@ export default function generateResourcePath(
     .replace(':sort?', processedParams.sort || '')
     .replace(':kinds?', processedParams.kinds || '');
 
-  console.log(output);
   return output;
 }

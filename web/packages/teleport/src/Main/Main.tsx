@@ -164,7 +164,7 @@ export function Main(props: MainProps) {
       >
         <MainContainer hasDockedElement={hasDockedElement}>
           <Navigation />
-          <HorizontalSplit>
+          <HorizontalSplit id="h-split">
             <ContentMinWidth>
               <Suspense fallback={null}>
                 <TopBar />
@@ -245,7 +245,7 @@ function FeatureRoutes({ lockedFeatures }: { lockedFeatures: LockedFeatures }) {
 }
 
 export const ContentMinWidth = styled.div`
-  min-width: calc(1250px - var(--sidebar-width));
+  min-width: calc(400px);
 `;
 
 export const HorizontalSplit = styled.div`

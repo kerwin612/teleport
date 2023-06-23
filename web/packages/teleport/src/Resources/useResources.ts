@@ -18,23 +18,19 @@ import { useEffect } from 'react';
 
 import Ctx from 'teleport/teleportContext';
 import useStickerClusterId from 'teleport/useStickyClusterId';
-import cfg from 'teleport/config';
-import { openNewTab } from 'teleport/lib/util';
-import {
-  useUrlFiltering,
-  useServerSidePagination,
-} from 'teleport/components/hooks';
+import { useUrlFiltering } from 'teleport/components/hooks';
+import { useInfiniteScroll } from 'teleport/components/hooks/useInfiniteScroll';
 
 export function useResources(ctx: Ctx) {
-  const { isLeafCluster, clusterId } = useStickerClusterId();
-  const canCreate = ctx.storeUser.getTokenAccess().create;
+  const { clusterId } = useStickerClusterId();
+  // const canCreate = ctx.storeUser.getTokenAccess().create;
 
   const { params, search, ...filteringProps } = useUrlFiltering({
-    fieldName: 'hostname',
+    fieldName: 'name',
     dir: 'ASC',
   });
 
-  const { fetch, fetchedData, ...paginationProps } = useServerSidePagination({
+  const { fetch, fetchedData, attempt, fetchMore } = useInfiniteScroll({
     fetchFunc: ctx.resourceService.fetchResources,
     clusterId,
     params,
@@ -44,32 +40,13 @@ export function useResources(ctx: Ctx) {
     fetch();
   }, [clusterId, search]);
 
-  // function getNodeLoginOptions(serverId: string) {
-  //   // const node = fetchedData.agents.find(node => node.id == serverId);
-  //   // return makeOptions(clusterId, node);
-  //   return [];
-  // }
-
-  const startSshSession = (login: string, serverId: string) => {
-    const url = cfg.getSshConnectRoute({
-      clusterId,
-      serverId,
-      login,
-    });
-
-    openNewTab(url);
-  };
-
   return {
+    ...filteringProps,
     fetchedData,
-    canCreate,
-    // getNodeLoginOptions,
-    startSshSession,
-    isLeafCluster,
     clusterId,
     params,
-    ...filteringProps,
-    ...paginationProps,
+    fetchMore,
+    attempt,
   };
 }
 

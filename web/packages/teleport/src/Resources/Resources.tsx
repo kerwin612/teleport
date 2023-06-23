@@ -15,73 +15,29 @@ limitations under the License.
 */
 
 import React from 'react';
-import { Indicator, Box } from 'design';
+import { Flex, Indicator, Box, ButtonPrimary } from 'design';
+
+import styled from 'styled-components';
 
 import {
   FeatureBox,
   FeatureHeader,
   FeatureHeaderTitle,
 } from 'teleport/components/Layout';
-import Empty, { EmptyStateInfo } from 'teleport/components/Empty';
 import ErrorMessage from 'teleport/components/AgentErrorMessage';
 import useTeleport from 'teleport/useTeleport';
-import { UnifiedResourceList } from 'teleport/components/UnifiedResourcesList';
 
 import { useResources } from './useResources';
+import { ResourceCard } from './ResourceCard';
 
 export function Resources() {
   const teleCtx = useTeleport();
-  const {
-    fetchedData,
-    // getNodeLoginOptions,
-    startSshSession,
-    attempt,
-    canCreate,
-    isLeafCluster,
-    clusterId,
-    fetchNext,
-    fetchPrev,
-    params,
-    pageSize,
-    setParams,
-    setSort,
-    pathname,
-    replaceHistory,
-    fetchStatus,
-    isSearchEmpty,
-    pageIndicators,
-    onLabelClick,
-  } = useResources(teleCtx);
-
-  function onLoginSelect(e: React.MouseEvent, login: string, serverId: string) {
-    e.preventDefault();
-    startSshSession(login, serverId);
-  }
-
-  // function onSshEnter(login: string, serverId: string) {
-  //   startSshSession(login, serverId);
-  // }
-
-  const hasNoNodes =
-    attempt.status === 'success' &&
-    fetchedData.agents.length === 0 &&
-    isSearchEmpty;
+  const { attempt, fetchedData, fetchMore } = useResources(teleCtx);
 
   return (
     <FeatureBox>
       <FeatureHeader alignItems="center" justifyContent="space-between">
-        <FeatureHeaderTitle>Everything</FeatureHeaderTitle>
-        {/* {attempt.status === 'success' && !hasNoNodes && (
-          <Flex alignItems="center">
-            <QuickLaunch width="280px" onPress={onSshEnter} mr={3} />
-            <AgentButtonAdd
-              agent="DONT CLICK"
-              beginsWithVowel={false}
-              isLeafCluster={isLeafCluster}
-              canCreate={canCreate}
-            />
-          </Flex>
-        )} */}
+        <FeatureHeaderTitle>Resources</FeatureHeaderTitle>
       </FeatureHeader>
       {attempt.status === 'failed' && (
         <ErrorMessage message={attempt.statusText} />
@@ -91,43 +47,26 @@ export function Resources() {
           <Indicator />
         </Box>
       )}
-      {attempt.status !== 'processing' && !hasNoNodes && (
-        <UnifiedResourceList
-          resources={fetchedData.agents}
-          // onLoginMenuOpen={getNodeLoginOptions}
-          onLoginSelect={onLoginSelect}
-          fetchNext={fetchNext}
-          fetchPrev={fetchPrev}
-          fetchStatus={fetchStatus}
-          pageSize={pageSize}
-          pageIndicators={pageIndicators}
-          params={params}
-          setParams={setParams}
-          setSort={setSort}
-          pathname={pathname}
-          replaceHistory={replaceHistory}
-          onLabelClick={onLabelClick}
-        />
-      )}
-      {attempt.status === 'success' && hasNoNodes && (
-        <Empty
-          clusterId={clusterId}
-          canCreate={canCreate && !isLeafCluster}
-          emptyStateInfo={emptyStateInfo}
-        />
+      {attempt.status === 'success' && (
+        <>
+          <ResourcesContainer>
+            {fetchedData.agents.map(agent => (
+              <ResourceCard key={agent.name} resource={agent} />
+            ))}
+          </ResourcesContainer>
+          <div style={{ marginTop: 16 }}>
+            <ButtonPrimary onClick={fetchMore}>Fetch More</ButtonPrimary>
+          </div>
+        </>
       )}
     </FeatureBox>
   );
 }
 
-const emptyStateInfo: EmptyStateInfo = {
-  title: 'Add your first server to Teleport',
-  byline:
-    'Teleport Server Access consolidates SSH access across all environments.',
-  docsURL: 'https://goteleport.com/docs/server-access/getting-started/',
-  resourceType: 'server',
-  readOnly: {
-    title: 'No Servers Found',
-    resource: 'servers',
-  },
-};
+const ResourcesContainer = styled(Flex)`
+  display: grid;
+  grid-template-columns: 1fr;
+  @media (max-width: 656px) {
+    background-color: red;
+  }
+`;
