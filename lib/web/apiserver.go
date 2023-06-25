@@ -2431,9 +2431,12 @@ func (h *Handler) getSiteNamespaces(w http.ResponseWriter, r *http.Request, _ ht
 // clusterUnifiedResourcesGet returns a list of resources for a given cluster site. This includes all resources available to be displayed in the web ui
 // such as Nodes, Apps, Desktops, etc etc
 func (h *Handler) clusterUnifiedResourcesGet(w http.ResponseWriter, r *http.Request, p httprouter.Params, sctx *SessionContext, site reversetunnel.RemoteSite) (interface{}, error) {
-	// Get a client to the Auth Server with the logged in user's identity. The
-	// identity of the logged in user is used to fetch the list of resources.
 	clt, err := sctx.GetUserClient(r.Context(), site)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	identity, err := sctx.GetIdentity()
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -2453,7 +2456,40 @@ func (h *Handler) clusterUnifiedResourcesGet(w http.ResponseWriter, r *http.Requ
 		return nil, trace.Wrap(err)
 	}
 
-	unifiedResources, err := ui.MakeUnifiedResource(site.GetName(), page.Resources, accessChecker)
+	dbNames, dbUsers, err := getDatabaseUsersAndNames(accessChecker)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	unifiedResources := make([]interface{}, 0)
+	for _, resource := range page.Resources {
+		switch r := resource.(type) {
+		case types.Server:
+			server, err := ui.MakeServer(site.GetName(), r, accessChecker)
+			if err != nil {
+				return nil, trace.Wrap(err)
+			}
+			unifiedResources = append(unifiedResources, server)
+		case types.DatabaseServer:
+			db := ui.MakeDatabase(r.GetDatabase(), dbUsers, dbNames)
+			unifiedResources = append(unifiedResources, db)
+		case types.AppServer:
+			app := ui.MakeApp(ui.MakeAppsConfig{
+				LocalClusterName:  site.GetName(),
+				LocalProxyDNSName: h.proxyDNSName(),
+				AppClusterName:    site.GetName(),
+				Identity:          identity,
+			}, r.GetApp())
+			unifiedResources = append(unifiedResources, app)
+		case types.WindowsDesktop:
+			desktop, err := ui.MakeDesktop(r, accessChecker)
+			if err != nil {
+				return nil, trace.Wrap(err)
+			}
+			unifiedResources = append(unifiedResources, desktop)
+		default:
+			return nil, trace.Errorf("UI Resource has unknown type: %T", resource)
+		}
+	}
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}

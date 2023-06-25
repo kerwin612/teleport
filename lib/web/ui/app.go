@@ -27,6 +27,8 @@ import (
 
 // App describes an application
 type App struct {
+	// Kind is the kind of resource. Used to parse which kind in a list of unified resources in the UI
+	Kind string `json:"kind"`
 	// Name is the name of the application.
 	Name string `json:"name"`
 	// Description is the app description.
@@ -71,6 +73,7 @@ func MakeApps(c MakeAppsConfig) []App {
 		labels := makeLabels(teleApp.GetAllLabels())
 
 		app := App{
+			Kind:         types.KindApp,
 			Name:         teleApp.GetName(),
 			Description:  teleApp.GetDescription(),
 			URI:          teleApp.GetURI(),
@@ -91,6 +94,24 @@ func MakeApps(c MakeAppsConfig) []App {
 	}
 
 	return result
+}
+
+func MakeApp(c MakeAppsConfig, teleApp types.Application) App {
+	fqdn := AssembleAppFQDN(c.LocalClusterName, c.LocalProxyDNSName, c.AppClusterName, teleApp)
+	labels := makeLabels(teleApp.GetAllLabels())
+	return App{
+		Kind:         types.KindApp,
+		Name:         teleApp.GetName(),
+		Description:  teleApp.GetDescription(),
+		URI:          teleApp.GetURI(),
+		PublicAddr:   teleApp.GetPublicAddr(),
+		Labels:       labels,
+		ClusterID:    c.AppClusterName,
+		FQDN:         fqdn,
+		AWSConsole:   teleApp.IsAWSConsole(),
+		FriendlyName: services.FriendlyName(teleApp),
+	}
+
 }
 
 // AssembleAppFQDN returns the application's FQDN.

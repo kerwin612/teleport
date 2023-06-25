@@ -38,6 +38,8 @@ type Label struct {
 
 // Server describes a server for webapp
 type Server struct {
+	// Kind is the kind of resource. Used to parse which kind in a list of unified resources in the UI
+	Kind string `json:"kind"`
 	// Tunnel indicates of this server is connected over a reverse tunnel.
 	Tunnel bool `json:"tunnel"`
 	// Name is this server name
@@ -83,6 +85,7 @@ func MakeServers(clusterName string, servers []types.Server, accessChecker servi
 		}
 
 		uiServers = append(uiServers, Server{
+			Kind:        types.KindNode,
 			ClusterName: clusterName,
 			Labels:      uiLabels,
 			Name:        server.GetName(),
@@ -107,6 +110,7 @@ func MakeServer(clusterName string, server types.Server, accessChecker services.
 	}
 
 	return Server{
+		Kind:        types.KindNode,
 		ClusterName: clusterName,
 		Labels:      uiLabels,
 		Name:        server.GetName(),
@@ -247,6 +251,8 @@ func ConnectionDiagnosticTraceUIFromTypes(traces []*types.ConnectionDiagnosticTr
 
 // Database describes a database server.
 type Database struct {
+	// Kind is the kind of resource. Used to parse which kind in a list of unified resources in the UI
+	Kind string `json:"kind"`
 	// Name is the name of the database.
 	Name string `json:"name"`
 	// Desc is the database description.
@@ -288,6 +294,7 @@ func MakeDatabase(database types.Database, dbUsers, dbNames []string) Database {
 	uiLabels := makeLabels(database.GetAllLabels())
 
 	db := Database{
+		Kind:          types.KindDatabase,
 		Name:          database.GetName(),
 		Desc:          database.GetDescription(),
 		Protocol:      database.GetProtocol(),
@@ -353,6 +360,8 @@ func MakeDatabaseServices(databaseServices []types.DatabaseService) []DatabaseSe
 
 // Desktop describes a desktop to pass to the ui.
 type Desktop struct {
+	// Kind is the kind of resource. Used to parse which kind in a list of unified resources in the UI
+	Kind string `json:"kind"`
 	// OS is the os of this desktop. Should be one of constants.WindowsOS, constants.LinuxOS, or constants.DarwinOS.
 	OS string `json:"os"`
 	// Name is name (uuid) of the windows desktop.
@@ -386,6 +395,7 @@ func MakeDesktop(windowsDesktop types.WindowsDesktop, accessChecker services.Acc
 	}
 
 	return Desktop{
+		Kind:   types.KindWindowsDesktop,
 		OS:     constants.WindowsOS,
 		Name:   windowsDesktop.GetName(),
 		Addr:   stripRdpPort(windowsDesktop.GetAddr()),
