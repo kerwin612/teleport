@@ -4403,6 +4403,24 @@ func (g *GRPCServer) GenerateCertAuthorityCRL(ctx context.Context, req *proto.Ce
 	return &proto.CRL{CRL: crl}, nil
 }
 
+func (g *GRPCServer) GetUnifiedResources(ctx context.Context, req *proto.ListUnifiedResourcesRequest) (*proto.ListUnifiedResourcesResponse, error) {
+	auth, err := g.authenticate(ctx)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	resp, err := auth.ListUnifiedResources(ctx, req)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	fmt.Println("------------------------------")
+	fmt.Printf("%+v\n", resp)
+	fmt.Println("------------------------------")
+
+	return nil, nil
+}
+
 // ListResources retrieves a paginated list of resources.
 func (g *GRPCServer) ListResources(ctx context.Context, req *proto.ListResourcesRequest) (*proto.ListResourcesResponse, error) {
 	auth, err := g.authenticate(ctx)

@@ -1554,6 +1554,15 @@ const (
 	kubeService = "kube_service"
 )
 
+func (a *ServerWithRoles) ListUnifiedResources(ctx context.Context, req *proto.ListUnifiedResourcesRequest) (*types.ListResourcesResponse, error) {
+	resp, err := a.listResourcesWithSort(ctx, proto.ListResourcesRequest{})
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	return resp, nil
+}
+
 // ListResources returns a paginated list of resources filtered by user access.
 func (a *ServerWithRoles) ListResources(ctx context.Context, req proto.ListResourcesRequest) (*types.ListResourcesResponse, error) {
 	// kubeService is a special resource type that is used to keep compatibility
@@ -1767,7 +1776,7 @@ func (a *ServerWithRoles) GetUnifiedResources(ctx context.Context, namespace str
 		return nil, trace.Wrap(err)
 	}
 
-	// Fetch full list of nodes in the backend.
+	// Fetch full list of unified resources in the backend.
 	startFetch := time.Now()
 	unifiedResources, err := a.authServer.unifiedResourceWatcher.GetUnifiedResources(ctx, namespace)
 	if err != nil {
@@ -1841,6 +1850,11 @@ func (a *ServerWithRoles) GetUnifiedResources(ctx context.Context, namespace str
 		"GetUnifiedResources(%v->%v) in %v.",
 		len(unifiedResources), len(filteredResources), elapsedFetch+elapsedFilter)
 
+	// Apply request filters and get pagination info.
+	resp, err := local.FakePaginate(filteredResources, req)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
 	return filteredResources, nil
 }
 

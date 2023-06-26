@@ -250,7 +250,7 @@ func matchAndFilterKubeClusters(resource types.ResourceWithLabels, filter MatchR
 
 // MatchResourceFilter holds the filter values to match against a resource.
 type MatchResourceFilter struct {
-	// ResourceKinds is a list of resource kinds and is used to fine tune the filtering.
+	// ResourceKind is the resource kind and is used to fine tune the filtering.
 	ResourceKind string
 	// Labels are the labels to match.
 	Labels map[string]string
