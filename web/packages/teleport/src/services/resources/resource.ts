@@ -17,7 +17,7 @@
 import api from 'teleport/services/api';
 import cfg, { UrlResourcesParams } from 'teleport/config';
 
-import { AgentResponse } from '../agents';
+import { AgentKind, AgentResponse } from '../agents';
 
 import { makeUnifiedResource } from './makeUnifiedResource';
 
@@ -34,7 +34,7 @@ class ResourceService {
     clusterId?: string,
     params?: UrlResourcesParams,
     signal?: AbortSignal
-  ): Promise<AgentResponse<UnifiedResource>> {
+  ): Promise<AgentResponse<AgentKind>> {
     return api
       .get(cfg.getUnifiedResourcesUrl(clusterId, params), signal)
       .then(json => {

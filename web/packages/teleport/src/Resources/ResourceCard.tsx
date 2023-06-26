@@ -3,20 +3,26 @@ import styled from 'styled-components';
 
 import { Flex } from 'design';
 
-import { UnifiedResource } from 'teleport/services/resources';
+import { AgentKind } from 'teleport/services/agents';
 
 type Props = {
-  resource: UnifiedResource;
+  resource: AgentKind;
 };
 export const ResourceCard = ({ resource }: Props) => {
   return (
     <CardContainer key={resource.name}>
-      <div>hello</div>
+      <div>{resource.name}</div>
     </CardContainer>
   );
 };
 
 export const CardContainer = styled(Flex)`
-  border: 2px solid grey;
-  padding: 16px;
+  border-top: 2px solid ${props => props.theme.colors.spotBackground[0]};
+  padding: ${props => props.theme.space[3]}px;
+
+  @media (min-width: ${props => props.theme.breakpoints.tablet}px) {
+    border: ${props => props.theme.borders[2]}
+      ${props => props.theme.colors.spotBackground[0]};
+    border-radius: ${props => props.theme.radii[3]}px;
+  }
 `;

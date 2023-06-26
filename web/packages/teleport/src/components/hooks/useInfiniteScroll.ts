@@ -46,6 +46,7 @@ export function useInfiniteScroll<T extends AgentKind>({
         limit: initialFetchSize,
         startKey: '',
       });
+      console.log('res', res);
 
       setFetchedData({
         ...fetchedData,

@@ -20,12 +20,11 @@ import { Node } from 'teleport/services/nodes';
 import { Kube } from 'teleport/services/kube';
 import { Desktop, WindowsDesktopService } from 'teleport/services/desktops';
 
-import { UnifiedResource } from '../resources';
-
 import type { MfaAuthnResponse } from '../mfa';
 
+export type UnifiedResourceKind = 'app' | 'node' | 'windows_desktop' | 'db';
+
 export type AgentKind =
-  | UnifiedResource
   | App
   | Database
   | Node

@@ -66,7 +66,13 @@ export function Resources() {
 const ResourcesContainer = styled(Flex)`
   display: grid;
   grid-template-columns: 1fr;
-  @media (max-width: 656px) {
-    background-color: red;
+  grid-gap: ${props => props.theme.space[3]}px;
+
+  @media (min-width: ${props => props.theme.breakpoints.tablet}px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (min-width: ${props => props.theme.breakpoints.desktop}px) {
+    grid-template-columns: repeat(3, 1fr);
   }
 `;
