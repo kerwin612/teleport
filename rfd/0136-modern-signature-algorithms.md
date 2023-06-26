@@ -44,13 +44,17 @@ Considerations:
 * RSA has the most widespread support among all protocols
 * Certain database protocols only support RSA client certs
   * <https://docs.snowflake.com/en/user-guide/key-pair-auth#step-2-generate-a-public-key>
-* If we must continue to support RSA, we might as well support larger key sizes,
-  3072 and 4096-bit are the most commonly used and supported by e.g. GCP KMS.
-* golang.org/x/crypto/ssh always uses SHA512 hash with RSA public keys
+* Some apps may only support RSA signed JWTs
+* If we must continue to support RSA, we might as well support larger key sizes
+  (at least for CA keys), 3072 and 4096-bit are the most commonly used and
+  supported by e.g. GCP KMS.
+* golang.org/x/crypto/ssh uses SHA512 hash by default with all RSA public keys
+  (but this can be overridden)
   <https://github.com/golang/crypto/blob/0ff60057bbafb685e9f9a97af5261f484f8283d1/ssh/certs.go#L443-L445>
-* crypto/x509 always uses SHA256 hash with RSA public keys
+* crypto/x509 uses SHA256 hash by default with all RSA public keys
+  (but this can be overridden)
   <https://github.com/golang/go/blob/dbf9bf2c39116f1330002ebba8f8870b96645d87/src/crypto/x509/x509.go#L1411-L1414>
-* ssh only supports the PKCS#1 v1.5 signature scheme
+* ssh only supports the PKCS#1 v1.5 signature scheme with RSA keys
   <https://datatracker.ietf.org/doc/html/rfc8332>
 * FIPS 186-5 approves all listed options
 * BoringCrypto supports all listed options
@@ -95,12 +99,14 @@ Considerations:
 * We are probably forced to continue unconditionally using RSA for database
   certs, I'm assuming this would apply to both client and CA.
 * Ed25519 is a modern favourite for SSH, but TLS (and HSM, KMS) support is lacking.
-* Teleport derives client SSH and TLS certs from the same client keypair,
-  supporting different algorithms for each would require larger product changes.
 * Teleport CAs use separate keypairs for SSH and TLS, they do not need to use
   the same algorithm.
-* Overall it looks like ECDSA with the P-256 curve is a secure, modern option
-  with good performance and good support for all protocols (except some databases).
+* Teleport derives client SSH and TLS certs from the same client keypair,
+  supporting different algorithms for each will require larger changes.
+* It may be time to split client SSH and TLS certs to support the
+  popular and secure Ed25519 algorithm for SSH and the widely-suported
+  `ECDSA_P256_SHA256` algorithm for TLS. This will also allows to evolve the
+  algorithms used for each protocol independently in the future.
 
 ### CAs
 
@@ -122,9 +128,9 @@ keys: ssh, tls
 
 uses: user ssh cert signing, user tls cert signing, ssh hosts trust this CA
 
-current algo: `RSA2048_PKCS1_SHA(256|512)`
+current algos: `RSA2048_PKCS1_SHA512` for SSH, `RSA2048_PKCS1_SHA256` for TLS
 
-proposed default algo: `ECDSA_P256_SHA256`? For both SSH and TLS
+proposed default algos: `Ed25519` for SSH, `ECDSA_P256_SHA256` for TLS
 
 #### Host CA
 
@@ -132,9 +138,9 @@ keys: ssh, tls
 
 uses: host ssh cert signing, host tls cert signing, ssh clients trust this CA
 
-current algo: `RSA2048_PKCS1_SHA(256|512)`
+current algos: `RSA2048_PKCS1_SHA512` for SSH, `RSA2048_PKCS1_SHA256` for TLS
 
-proposed default algo: `ECDSA_P256_SHA256`? For both SSH and TLS
+proposed default algos: `Ed25519` for SSH, `ECDSA_P256_SHA256` for TLS
 
 #### Database CA
 
@@ -144,7 +150,7 @@ uses: user db tls cert signing, dbs trust this CA
 
 current algo: `RSA2048_PKCS1_SHA256`
 
-proposed default algo: RSA2048?
+proposed default algo: `RSA2048_PKCS1_SHA256`
 
 #### JWT CA
 
@@ -154,27 +160,27 @@ uses: user jwt cert signing, exposed at `/.well-known/jwks.json`, applications t
 
 current algo: `RSA2048_PKCS1_SHA256`
 
-proposed default algo: `ECDSA_P256_SHA256`?
+proposed default algo: `ECDSA_P256_SHA256`
 
 #### OIDC IdP CA
 
 keys: jwt
 
-uses: TODO
+uses: signing JWTs as an OIDC provider.
 
-current algo: RSA2048
+current algo: `RSA2048_PKCS1_SHA256`
 
-proposed default algo: `ECDSA_P256_SHA256`?
+proposed default algo: `ECDSA_P256_SHA256`
 
 #### SAML IdP CA
 
 keys: tls
 
-uses: TODO
+uses: signing SAML assertions as a SAML provider.
 
-current algo: RSA2048
+current algo: `RSA2048_PKCS1_SHA256`
 
-proposed default algo: `ECDSA_P256_SHA256`?
+proposed default algo: `ECDSA_P256_SHA256`
 
 ### CA Configuration
 
@@ -206,14 +212,13 @@ spec:
   ca_key_params:
     host:
       ssh:
-        algorithm: ECDSA_P256_SHA256 # users can select one of our chosen supported algorithms
+        algorithm: Ed25519 # users can select one of our chosen supported algorithms
       tls:
         algorithm: ECDSA_P256_SHA256
     user:
       ssh:
         algorithm: Ed25519
       tls:
-        # Maybe SSH and TLS can mismatch? Or we block this for now but leave the door open for the future
         algorithm: ECDSA_P256_SHA256
     jwt:
       jwt:
@@ -305,28 +310,26 @@ We have a few options for how to evolve this:
 
 1. Choose a new unconfigurable algorithm to use for each client.
 2. Try to match the algorithm of the relevant CA for each.
-3. Make each configurable cluster-wide. (this is similar to (2) but doesn't
-   require subject and CA algorithms to match).
+3. Configure a list of supported subject key algorithms for each CA key in
+   preference order, clients should choose the first algorithm they support.
 4. Make each configurable by each subject (like `tsh login --keytype ecdsa_P256`, new field in `teleport.yaml` for hosts, etc).
 
-My personal opinion: The MVP is (2).
-(1) is not flexible enough, (2) seems like it would cover >80% of cases, (3)
-adds a few more knobs without major benefits, someone will eventually ask for
-(4) and we can consider adding it then.
+My personal opinion: The configured list of supported subject key algorithms for
+option (3) is probably necessary, so that clients on older versions still
+generating RSA keys can be supported temporarily, and then blocked once the
+RSA2048 algorithms are removed from the list.
+We can start with option (3) and implement (4) one day if there is a compelling
+reason.
+(1) and (2) don't seem flexible enough.
 
 ### Backward Compatibility
 
 * Will the change impact older clients? (tsh, tctl)
 
-Auth servers with non-default algorithms configured should continue to sign
-certificates for clients on older Teleport versions using RSA2048 keys.
-
-Open questions:
-
-* Should we start rejecting RSA2048 (if a different algo is configured) in
-  future Teleport versions (V15)?
-* Should we make some configurable `allowed_subject_algorithms` per CA to put
-  this in the hands of the user?
+By default, Auth servers with non-default algorithms configured should continue
+to sign certificates for clients on older Teleport versions using RSA2048 keys.
+This can be configured with a list of `allowed_subject_algorithms` per CA key
+type so that RSA keys can eventually be rejected when the user is ready.
 
 * Are there any backend migrations required?
 
