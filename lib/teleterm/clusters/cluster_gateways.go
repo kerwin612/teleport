@@ -21,6 +21,7 @@ import (
 
 	"github.com/gravitational/trace"
 
+	"github.com/gravitational/teleport/lib/teleterm/api/uri"
 	"github.com/gravitational/teleport/lib/teleterm/gateway"
 	"github.com/gravitational/teleport/lib/tlsca"
 )
@@ -36,7 +37,6 @@ type CreateGatewayParams struct {
 	// LocalPort is the gateway local port
 	LocalPort          string
 	CLICommandProvider gateway.CLICommandProvider
-	TCPPortAllocator   gateway.TCPPortAllocator
 	OnExpiredCert      gateway.OnExpiredCertFunc
 }
 
@@ -53,7 +53,7 @@ func (c *Cluster) CreateGateway(ctx context.Context, params CreateGatewayParams)
 		Username:    params.TargetUser,
 	}
 
-	if err := c.ReissueDBCerts(ctx, routeToDatabase); err != nil {
+	if err := c.reissueDBCerts(ctx, routeToDatabase); err != nil {
 		return nil, trace.Wrap(err)
 	}
 
@@ -70,7 +70,6 @@ func (c *Cluster) CreateGateway(ctx context.Context, params CreateGatewayParams)
 		WebProxyAddr:                  c.clusterClient.WebProxyAddr,
 		Log:                           c.Log,
 		CLICommandProvider:            params.CLICommandProvider,
-		TCPPortAllocator:              params.TCPPortAllocator,
 		OnExpiredCert:                 params.OnExpiredCert,
 		Clock:                         c.clock,
 		TLSRoutingConnUpgradeRequired: c.clusterClient.TLSRoutingConnUpgradeRequired,
@@ -81,4 +80,16 @@ func (c *Cluster) CreateGateway(ctx context.Context, params CreateGatewayParams)
 	}
 
 	return gw, nil
+}
+
+// ReissueCertForGateway reissues certificate for provided gateway.
+func (c *Cluster) ReissueCertForGateway(ctx context.Context, gateway *gateway.Gateway) error {
+	switch {
+	case uri.IsDB(gateway.TargetURI()):
+		return trace.Wrap(c.reissueDBCerts(ctx, gateway.RouteToDatabase()))
+	case uri.IsKube(gateway.TargetURI()):
+		return trace.Wrap(c.reissueKubeCert(ctx, gateway.TargetName()))
+	default:
+		return nil
+	}
 }

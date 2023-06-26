@@ -305,6 +305,22 @@ type CLICommandProvider interface {
 	GetCommand(gateway *Gateway) (*exec.Cmd, error)
 }
 
+// GatewayInfo defines a subset of Gateway functions that provides information
+// of the Gateway.
+type GatewayInfo interface {
+	TargetURI() string
+	TargetName() string
+	Protocol() string
+	TargetUser() string
+	TargetSubresourceName() string
+	LocalAddress() string
+	LocalPort() string
+	LocalPortInt() int
+	RouteToDatabase() tlsca.RouteToDatabase
+	KubeconfigPath() string
+	Log() *logrus.Entry
+}
+
 type TCPPortAllocator interface {
 	Listen(localAddress, port string) (net.Listener, error)
 }

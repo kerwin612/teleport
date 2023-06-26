@@ -32,7 +32,6 @@ import (
 	"github.com/gravitational/teleport/lib/teleterm/api/uri"
 	"github.com/gravitational/teleport/lib/teleterm/clusters"
 	"github.com/gravitational/teleport/lib/teleterm/gateway"
-	"github.com/gravitational/teleport/lib/tlsca"
 )
 
 var log = logrus.WithField(trace.Component, "reissuer")
@@ -132,20 +131,20 @@ func TestReissueCert(t *testing.T) {
 				Log:              log,
 				TSHDEventsClient: tshdEventsClient,
 			}
-			dbCertReissuer := &mockDBCertReissuer{
+			certReissuer := &mockCertReissuer{
 				returnValuesForSubsequentCalls: tt.reissueErrs,
 			}
 			if tt.reissuerOpt != nil {
 				tt.reissuerOpt(t, reissuer)
 			}
-			err := reissuer.ReissueCert(ctx, gateway, dbCertReissuer)
+			err := reissuer.ReissueCert(ctx, gateway, certReissuer)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 				require.ErrorContains(t, err, tt.wantAddedMessage)
 			} else {
 				require.NoError(t, err)
 			}
-			require.Equal(t, tt.wantReissueCalls, dbCertReissuer.callCount,
+			require.Equal(t, tt.wantReissueCalls, certReissuer.callCount,
 				"Unexpected number of calls to DBCertReissuer.ReissueDBCerts")
 			require.Equal(t, tt.wantReloginCalls, tshdEventsClient.callCounts["Relogin"],
 				"Unexpected number of calls to TSHDEventsClient.Relogin")
@@ -168,12 +167,12 @@ func mustCreateGateway(ctx context.Context, t *testing.T) *gateway.Gateway {
 	return gateway
 }
 
-type mockDBCertReissuer struct {
+type mockCertReissuer struct {
 	callCount                      int
 	returnValuesForSubsequentCalls []error
 }
 
-func (r *mockDBCertReissuer) ReissueDBCerts(context.Context, tlsca.RouteToDatabase) error {
+func (r *mockCertReissuer) ReissueCertForGateway(context.Context, *gateway.Gateway) error {
 	var err error
 	if r.callCount < len(r.returnValuesForSubsequentCalls) {
 		err = r.returnValuesForSubsequentCalls[r.callCount]
