@@ -13,7 +13,7 @@ TODO
 
 Teleport should support modern key types and signature algorithms, currently
 only RSA2048 keys are supported with the PKCS#1 v1.5 signature scheme.
-This applies to CA keys and client (user/host) keys, but each can/will be
+This applies to CA keys and subject (user/host/db) keys, but each can/will be
 addressed individually.
 
 ## Why
@@ -33,7 +33,7 @@ These algorithms are being considered for support:
 
 Private key sizes: 2048, 3072, 4096
 
-Signature algorithms: PKCS#1 v1.5, (maybe PSS for TLS and JWT? SSH does not support it)
+Signature algorithms: PKCS#1 v1.5
 
 Digest/hash algorithms: SHA512 for SSH, SHA256 for TLS
 
@@ -58,25 +58,29 @@ Considerations:
   <https://datatracker.ietf.org/doc/html/rfc8332>
 * FIPS 186-5 approves all listed options
 * BoringCrypto supports all listed options
+* We could consider PSS signatures instead of PKCS#1 v1.5 for TLS and JWT
+  signatures, but SSH does not support it.
 
 #### ECDSA
 
-Curves: P-256, (maybe P-384, P-521?)
+Curves: P-256
 
-Digest/hash algorithms: SHA256, (or SHA384, SHA512 for P-384, P-521)
+Digest/hash algorithms: SHA256
 
 Considerations:
 
 * ECDSA has good support across SSH and TLS protocols for both client and CA
   certs.
+* ECDSA certs are supported by web browsers.
 * ECDSA key generation is *much* faster than RSA key generation.
 * ECDSA signatures are faster than RSA signatures.
 * FIPS 186-5 approves all listed options
 * BoringCrypto supports all listed options
+* We could consider supporting the P-384 and P-521 curves for CAs
 
 #### EdDSA
 
-Curves: Ed25519 (this is the only curve supported in Go)
+Curves: Ed25519
 
 Digest/hash algorithms: none (the full message is signed without hashing)
 
@@ -93,6 +97,7 @@ Considerations:
 * FIPS 186-5 approves Ed25519
 * BoringCrypto does not support Ed25519
   <https://go.googlesource.com/go/+/dev.boringcrypto/src/crypto/tls/boring.go#80>
+* Ed25519 is the only EdDSA curve supported in the Go standard library.
 
 #### Summary
 
@@ -103,8 +108,8 @@ Considerations:
   the same algorithm.
 * Teleport derives client SSH and TLS certs from the same client keypair,
   supporting different algorithms for each will require larger changes.
-* It may be time to split client SSH and TLS certs to support the
-  popular and secure Ed25519 algorithm for SSH and the widely-suported
+* It seems it is time to split client SSH and TLS keys to support the popular
+  and secure Ed25519 algorithm for SSH and the widely-suported
   `ECDSA_P256_SHA256` algorithm for TLS. This will also allows to evolve the
   algorithms used for each protocol independently in the future.
 
@@ -119,6 +124,7 @@ Each Teleport CA holds 1 or more of the following:
 Each CA key may be a software key stored in the Teleport backend, an HSM key
 held in an HSM connected to a local Auth server via a PKCS#11 interface, or a
 KMS key held in GCP KMS.
+In the future we will likely support more KMS services.
 
 Teleport currently has these CAs:
 
@@ -128,9 +134,54 @@ keys: ssh, tls
 
 uses: user ssh cert signing, user tls cert signing, ssh hosts trust this CA
 
-current algos: `RSA2048_PKCS1_SHA512` for SSH, `RSA2048_PKCS1_SHA256` for TLS
+* current SSH algo: `RSA2048_PKCS1_SHA512`
+* proposed supported SSH algos:
+  * `Ed25519`
+  * `ECDSA_P256_SHA256`
+  * `RSA2048_PKCS1_SHA512`
+  * `RSA3072_PKCS1_SHA512`
+  * `RSA4096_PKCS1_SHA512`
+* proposed `recommended` SSH algo (non-fips): `Ed25519`
+* proposed `recommended` SSH algo (fips): `ECDSA_P256_SHA256`
+* proposed supported SSH `allowed_subject_algorithms`:
+  * `Ed25519`
+  * `ECDSA_P256_SHA256`
+  * `RSA2048_PKCS1_SHA512`
+  * `RSA3072_PKCS1_SHA512`
+  * `RSA4096_PKCS1_SHA512`
+* proposed `recommended` SSH `allowed_subject_algorithms` (non-fips):
+  * `Ed25519`
+  * `RSA2048_PKCS1_SHA512`
+* proposed `recommended` SSH `allowed_subject_algorithms` (fips):
+  * `ECDSA_P256_SHA256`
+  * `RSA2048_PKCS1_SHA512`
+* reasoning:
+  * `Ed25519` is the current best-in-class for SSH
+  * `ECDSA_P256_SHA256` has Go BoringCrypto support
+  * some environments still require RSA
 
-proposed default algos: `Ed25519` for SSH, `ECDSA_P256_SHA256` for TLS
+* current TLS algo: `RSA2048_PKCS1_SHA256`
+* proposed supported TLS algos:
+  * `ECDSA_P256_SHA256`
+  * `Ed25519`
+  * `RSA2048_PKCS1_SHA256`
+* proposed `recommended` TLS algo: `ECDSA_P256_SHA256`
+* proposed supported TLS `allowed_subject_algorithms`:
+  * `ECDSA_P256_SHA256`
+  * `Ed25519`
+  * `RSA2048_PKCS1_SHA512`
+  * `RSA3072_PKCS1_SHA512`
+  * `RSA4096_PKCS1_SHA512`
+* proposed `recommended` TLS `allowed_subject_algorithms`:
+  * `ECDSA_P256_SHA256`
+  * `Ed25519`
+  * `RSA2048_PKCS1_SHA512`
+* reasoning:
+  * `ECDSA_P256_SHA256` has the broadest support among external tools
+  * `Ed25519` support is becoming more common and some prefer it
+  * `RSA2048_PKCS1_SHA256` will be supported for backward compatibility, but
+    ECDSA support is widespread enough I don't think we should support bigger
+    RSA keys, we should guide people toward ECDSA instead.
 
 #### Host CA
 
@@ -138,29 +189,114 @@ keys: ssh, tls
 
 uses: host ssh cert signing, host tls cert signing, ssh clients trust this CA
 
-current algos: `RSA2048_PKCS1_SHA512` for SSH, `RSA2048_PKCS1_SHA256` for TLS
+* current SSH algo: `RSA2048_PKCS1_SHA512`
+* proposed supported SSH algos:
+  * `Ed25519`
+  * `ECDSA_P256_SHA256`
+  * `RSA2048_PKCS1_SHA512`
+  * `RSA3072_PKCS1_SHA512`
+  * `RSA4096_PKCS1_SHA512`
+* proposed `recommended` SSH algo (non-fips): `Ed25519`
+* proposed `recommended` SSH algo (fips): `ECDSA_P256_SHA256`
+* proposed supported SSH `allowed_subject_algorithms`:
+  * `Ed25519`
+  * `ECDSA_P256_SHA256`
+  * `RSA2048_PKCS1_SHA512`
+  * `RSA3072_PKCS1_SHA512`
+  * `RSA4096_PKCS1_SHA512`
+* proposed `recommended` SSH `allowed_subject_algorithms` (non-fips):
+  * `Ed25519`
+  * `RSA2048_PKCS1_SHA512`
+* proposed `recommended` SSH `allowed_subject_algorithms` (fips):
+  * `ECDSA_P256_SHA256`
+  * `RSA2048_PKCS1_SHA512`
+* reasoning:
+  * `Ed25519` is the current best-in-class for SSH
+  * `ECDSA_P256_SHA256` has Go BoringCrypto support
+  * some environments still require RSA
 
-proposed default algos: `Ed25519` for SSH, `ECDSA_P256_SHA256` for TLS
+* current TLS algo: `RSA2048_PKCS1_SHA256`
+* proposed supported TLS algos:
+  * `ECDSA_P256_SHA256`
+  * `Ed25519`
+  * `RSA2048_PKCS1_SHA256`
+* proposed `recommended` TLS algo: `ECDSA_P256_SHA256`
+* proposed supported TLS `allowed_subject_algorithms`:
+  * `ECDSA_P256_SHA256`
+  * `Ed25519`
+  * `RSA2048_PKCS1_SHA256`
+* proposed `recommended` TLS `allowed_subject_algorithms`:
+  * `ECDSA_P256_SHA256`
+  * `Ed25519`
+  * `RSA2048_PKCS1_SHA256`
+* reasoning:
+  * `EDCSA_P256_SHA256` has BoringCrypto support.
+  * `Ed25519` support is becoming more common and some people prefer it
+  * `RSA2048_PKCS1_SHA256` will be supported for backward compatibility
 
 #### Database CA
 
 keys: tls
 
-uses: user db tls cert signing, dbs trust this CA
+uses:
 
-current algo: `RSA2048_PKCS1_SHA256`
+* signs (often) long-lived db cert used to authenticate db to database service
+* signs short-lived proxy cert used to authenticate proxy to database service
+* signed snowflake JWTs
 
-proposed default algo: `RSA2048_PKCS1_SHA256`
+* current TLS algo: `RSA2048_PKCS1_SHA256`
+* proposed supported TLS algos:
+  * `ECDSA_P256_SHA256`
+  * `Ed25519`
+  * `RSA2048_PKCS1_SHA256`
+  * `RSA3072_PKCS1_SHA256`
+  * `RSA4096_PKCS1_SHA256`
+* proposed `recommended` TLS algo: `RSA3072_PKCS1_SHA256`
+* proposed supported TLS `allowed_subject_algorithms`:
+  * `ECDSA_P256_SHA256`
+  * `Ed25519`
+  * `RSA2048_PKCS1_SHA256`
+  * `RSA3072_PKCS1_SHA256`
+  * `RSA4096_PKCS1_SHA256`
+* proposed `recommended` TLS `allowed_subject_algorithms`:
+  * `RSA2048_PKCS1_SHA256`
+  * `RSA3072_PKCS1_SHA256`
+  * `ECDSA_P256_SHA256`
+  * `Ed25519`
+* reasoning:
+  * some database protocols still require RSA, reduce friction by keeping it as
+    the default
+  * eventually we should default to `RSA3072_PKCS1_SHA256` for long-lived db
+    certs that require RSA, but use an algorithm that is cheaper to generate
+    keys for the proxy certs that authenticate to the db service, since these
+    are only used internally we should go for Ed25519
 
 #### JWT CA
 
 keys: jwt
 
-uses: user jwt cert signing, exposed at `/.well-known/jwks.json`, applications that verify user JWTs trust this CA
+uses: user jwt cert signing, exposed at `/.well-known/jwks.json`, applications
+that verify user JWTs trust this CA
 
-current algo: `RSA2048_PKCS1_SHA256`
-
-proposed default algo: `ECDSA_P256_SHA256`
+* current algo: `RSA2048_PKCS1_SHA256`
+* proposed supported algos:
+  * `ECDSA_P256_SHA256`
+  * `Ed25519`
+  * `RSA2048_PKCS1_SHA256`
+* proposed `recommended` algo: `ECDSA_P256_SHA256`
+* proposed supported TLS `allowed_subject_algorithms`:
+  * `ECDSA_P256_SHA256`
+  * `Ed25519`
+  * `RSA2048_PKCS1_SHA256`
+* proposed `recommended` `allowed_subject_algorithms`:
+  * `ECDSA_P256_SHA256`
+  * `Ed25519`
+* reasoning:
+  * except RSA, `EDCSA_P256_SHA256` has the broadest support among external tools
+  * `Ed25519` support is becoming more common and some people prefer it
+  * `RSA2048_PKCS1_SHA256` will be supported for backward compatibility, but
+    ECDSA support is widespread enough I don't think we should support bigger
+    RSA keys, we should guide people toward ECDSA instead.
 
 #### OIDC IdP CA
 
@@ -168,9 +304,25 @@ keys: jwt
 
 uses: signing JWTs as an OIDC provider.
 
-current algo: `RSA2048_PKCS1_SHA256`
-
-proposed default algo: `ECDSA_P256_SHA256`
+* current algo: `RSA2048_PKCS1_SHA256`
+* proposed supported algos:
+  * `ECDSA_P256_SHA256`
+  * `Ed25519`
+  * `RSA2048_PKCS1_SHA256`
+* proposed `recommended` algo: `ECDSA_P256_SHA256`
+* proposed supported TLS `allowed_subject_algorithms`:
+  * `ECDSA_P256_SHA256`
+  * `Ed25519`
+  * `RSA2048_PKCS1_SHA256`
+* proposed `recommended` `allowed_subject_algorithms`:
+  * `ECDSA_P256_SHA256`
+  * `Ed25519`
+* reasoning:
+  * except RSA, `EDCSA_P256_SHA256` has the broadest support among external tools
+  * `Ed25519` support is becoming more common and some people prefer it
+  * `RSA2048_PKCS1_SHA256` will be supported for backward compatibility, but
+    ECDSA support is widespread enough I don't think we should support bigger
+    RSA keys, we should guide people toward ECDSA instead.
 
 #### SAML IdP CA
 
@@ -178,31 +330,106 @@ keys: tls
 
 uses: signing SAML assertions as a SAML provider.
 
-current algo: `RSA2048_PKCS1_SHA256`
-
-proposed default algo: `ECDSA_P256_SHA256`
+* current TLS algo: `RSA2048_PKCS1_SHA256`
+* proposed supported TLS algos:
+  * `ECDSA_P256_SHA256`
+  * `Ed25519`
+  * `RSA2048_PKCS1_SHA256`
+* proposed `recommended` TLS algo: `ECDSA_P256_SHA256`
+* proposed supported TLS `allowed_subject_algorithms`:
+  * `ECDSA_P256_SHA256`
+  * `Ed25519`
+  * `RSA2048_PKCS1_SHA256`
+* proposed `recommended` TLS `allowed_subject_algorithms`:
+  * `ECDSA_P256_SHA256`
+  * `Ed25519`
+  * `RSA2048_PKCS1_SHA256`
+* reasoning:
+  * `EDCSA_P256_SHA256` has BoringCrypto support.
+  * `Ed25519` support is becoming more common and some people prefer it
+  * `RSA2048_PKCS1_SHA256` will be supported for backward compatibility
 
 ### CA Configuration
 
-We have a few options for how to evolve the algorithms used for CA keys and
-signatures.
+CA key types and signature algorithms will be configurable via
+`cluster_auth_preference` and `teleport.yaml`
 
-#### 1. Don't make it configurable
+We want it configurable via `teleport.yaml` so that you can start a new cluster
+and the CA keys will be automatically generated at first start with the correct
+algorithms, so you don't have to immediately edit the `cap` and then rotate all
+of your brand-new CAs.
 
-We can just pick a new algorithm to use universally (one for each CA).
-This will be used for all new clusters.
-It will also be used for new keys the next time that existing clusters do a CA
-rotation.
+We want it configurable via `cluster_auth_preference` as well so that it can be
+configurable for Cloud users.
 
-#### 2. Make it configurable via `cluster_auth_preference` and `teleport.yaml`
+If any values under `ca_key_params` are explicitly set in the
+`cluster_auth_preference`, it will completely override the settings from
+`teleport.yaml`
 
-Why both?
-We probably don't want it configurable only via `cluster_auth_preference` so
-that you can start a new cluster and the ca keys will be automatically generated
-at first start with the correct algorithms, so you don't have to immediately
-edit the `cap` and then rotate all of your brand-new CAs.
-We probably don't want it configurable only via `teleport.yaml` so that it can
-be configurable for Cloud.
+```yaml
+# teleport.yaml
+version: v3
+auth_service:
+  enabled: true
+
+  ca_key_params:
+
+    # ca_key_params is already a part of the `teleport.yaml`, it has `gcp_kms` and
+    # `pkcs11` subsections for enabling KMS/HSMs per auth server.
+    gcp_kms:
+      keyring: projects/teleport-dev-123456/locations/us-west1/keyRings/nic-example-1
+      protection_level: "SOFTWARE"
+
+    user:
+      ssh:
+        # any supported algorithm can be selected for each protocol per CA
+        algorithm: Ed25519
+
+        # any subset of supported subject algorithms can be allowed, up to date
+        # compliant clients should select the first algorithm from this list that
+        # they support, or a preffered algorithm for the protocol from this list
+        allowed_subject_algorithms:
+          - Ed25519
+          - RSA2048_PKCS1_SHA512
+      tls:
+        # delete recommended to use Teleport's recommended algorithm for this CA
+        # and protocol
+        algorithm: recommended
+        allowed_subject_algorithms:
+          # this will expand to our recommended list of allowed subject
+          # algorithms
+          - recommended
+    host:
+      ssh:
+        # this configures the host CA to use an RSA4096 key
+        algorithm: RSA4096_PKCS1_SHA512
+        # this configures hosts to always get RSA2048 certs
+        allowed_subject_algorithms:
+          - RSA2048_PKCS1_SHA512
+
+      # any unlisted fields will default to all "recommended"
+      tls:
+        algorithm: recommended
+        allowed_subject_algorithms: [recommended]
+
+    # any unlisted CAs will default to all "recommended"
+    db:
+      tls:
+        algorithm: recommended
+        allowed_subject_algorithms: [recommended]
+    jwt:
+      jwt:
+        algorithm: recommended
+        allowed_subject_algorithms: [recommended]
+    saml_idp:
+      tls:
+        algorithm: recommended
+        allowed_subject_algorithms: [recommended]
+    oidc_idp:
+      jwt:
+        algorithm: recommended
+        allowed_subject_algorithms: [recommended]
+```
 
 ```yaml
 kind: cluster_auth_preference
@@ -210,86 +437,58 @@ metadata:
   name: cluster-auth-preference
 spec:
   ca_key_params:
-    host:
-      ssh:
-        algorithm: Ed25519 # users can select one of our chosen supported algorithms
-      tls:
-        algorithm: ECDSA_P256_SHA256
-    user:
-      ssh:
-        algorithm: Ed25519
-      tls:
-        algorithm: ECDSA_P256_SHA256
-    jwt:
-      jwt:
-        # You can choose "recommended" to let Teleport automatically pick the
-        # algorithm, and it may automatically change in the future during a user-initiated
-        # CA rotation.
-        algorithm: recommended
-    db:
-      tls:
-        # likely that people will want to stick with RSA for DB access compat
-        algorithm: RSA2048_PKCS1_SHA256
-
-    # We should (probably) offer a user configurable default for two reasons:
-    # 1. so users don't have to list out every single CA type
-    # 2. so we can follow it when new CA types are added
-    default:
+    ca_defaults:
       ssh:
         algorithm: recommended # let Teleport choose
+        allowed_subject_algorithms: [recommended]
       tls:
-        algorithm: ECDSA_P256_SHA256 # always use this for TLS keys
+        algorithm: recommended # let Teleport choose
+        allowed_subject_algorithms: [recommended]
       jwt:
         algorithm: recommended
-```
-
-```yaml
-# teleport.yaml
-version: v3
-auth_service:
-  enabled: true
-  ca_key_params:
-    gcp_kms:
-      keyring: projects/teleport-dev-320620/locations/us-west1/keyRings/nic-testplan-13
-      protection_level: "SOFTWARE"
-    default:
-      ssh:
-        algorithm: recommended
-      tls:
-        algorithm: recommended
-      jwt:
-        algorithm: recommended
-    host:
-      ssh:
-        algorithm: ECDSA_P256_SHA256
-      tls:
-        algorithm: ECDSA_P256_SHA256
+        allowed_subject_algorithms: [recommended]
     user:
       ssh:
-        algorithm: Ed25519
+        algorithm: recommended
+        allowed_subject_algorithms: [recommended]
       tls:
-        algorithm: ECDSA_P256_SHA256
+        algorithm: recommended
+        allowed_subject_algorithms: [recommended]
+    host:
+      ssh:
+        algorithm: recommended
+        allowed_subject_algorithms: [recommended]
+      tls:
+        algorithm: recommended
+        allowed_subject_algorithms: [recommended]
     db:
       tls:
-        algorithm: RSA2048
+        algorithm: recommended
+        allowed_subject_algorithms: [recommended]
     jwt:
       jwt:
-        algorithm: recommended # let Teleport choose
+        algorithm: recommended
+        allowed_subject_algorithms: [recommended]
+    saml_idp:
+      tls:
+        algorithm: recommended
+        allowed_subject_algorithms: [recommended]
+    oidc_idp:
+      jwt:
+        algorithm: recommended
+        allowed_subject_algorithms: [recommended]
 ```
 
 #### Cloud
 
 Cloud will be able to select their preferred defaults by configuring them in the
-`teleport.yaml`
+`teleport.yaml`.
+Cloud users will be able to change the CA algorithms by modifying the
+`cluster_auth_preference` and performing a CA rotation.
 
-Should CA algorithms be configurable by Cloud users?
-I don't see why not, we will only support secure algorithms.
-They can choose their own algorithms be editing the `cluster_auth_preference`
-and doing a CA rotation.
+### Subjects (users/hosts/DBs/JWTs)
 
-### Subjects
-
-It will be nice to update the CA key algorithms for security and performance
+It will be great to update the CA key algorithms for security and performance
 benefits, but what users really see on a day-to-day basis is their user keys.
 
 "Subjects" that have certificates issued by the Teleport CAs include:
@@ -302,25 +501,98 @@ benefits, but what users really see on a day-to-day basis is their user keys.
 * Machine ID (`tbot`)
 * Teleport Plugins
 * OpenSSH hosts
+* Databases
+* Proxies communicating with remote database services
 
 All of these currently generate an RSA2048 keypair locally, send the public key
 to the auth server, and receive signed certificates of some variety.
 
-We have a few options for how to evolve this:
+The `allowed_subject_algorithms` field described in the CA configuration section
+will control which key algorithms can be used by subject keys.
+These should be in preference order, compliant clients should pick the first
+algorithm from the list that they support.
+This will allow us to introduce new algorithms to the list without breaking
+compatibility with existing clients.
 
-1. Choose a new unconfigurable algorithm to use for each client.
-2. Try to match the algorithm of the relevant CA for each.
-3. Configure a list of supported subject key algorithms for each CA key in
-   preference order, clients should choose the first algorithm they support.
-4. Make each configurable by each subject (like `tsh login --keytype ecdsa_P256`, new field in `teleport.yaml` for hosts, etc).
+In some cases, Teleport services may choose a preferred algorithm from the list
+that is not the first one they support.
+For example, the Database CA signs DB certs that are often fairly long-lived, as
+well as short-lived certs used by proxies connecting to remote database services
+on behalf of the user, it may be preferable to select different algorithms for
+each case.
 
-My personal opinion: The configured list of supported subject key algorithms for
-option (3) is probably necessary, so that clients on older versions still
-generating RSA keys can be supported temporarily, and then blocked once the
-RSA2048 algorithms are removed from the list.
-We can start with option (3) and implement (4) one day if there is a compelling
-reason.
-(1) and (2) don't seem flexible enough.
+### Splitting user SSH and TLS private keys
+
+In order to support the use of different key types for SSH and TLS, users will
+need to start generating two different private keys, one for each protocol.
+This will change the disk layout of the ~/.tsh directory:
+
+```diff
+  ~/.tsh/                             --> default base directory
+  ├── current-profile                 --> file containing the name of the currently active profile
+  ├── one.example.com.yaml            --> file containing profile details for proxy "one.example.com"
+  ├── two.example.com.yaml            --> file containing profile details for proxy "two.example.com"
+  ├── known_hosts                     --> trusted certificate authorities (their keys) in a format similar to known_hosts
+  └── keys                            --> session keys directory
+     ├── one.example.com              --> Proxy hostname
+     │   ├── certs.pem                --> TLS CA certs for the Teleport CA
+-    │   ├── foo                      --> Private Key for user "foo"
+-    │   ├── foo.pub                  --> Public Key
++    │   ├── foo                      --> SSH Private Key for user "foo"
++    │   ├── foo.pub                  --> SSH Public Key
+     │   ├── foo.ppk                  --> PuTTY PPK-formatted keypair for user "foo"
+     │   ├── kube_credentials.lock    --> Kube credential lockfile, used to prevent excessive relogin attempts
++    │   ├── foo-x509-privkey.pem     --> TLS client private key
+     │   ├── foo-x509.pem             --> TLS client certificate for Auth Server
+     │   ├── foo-ssh                  --> SSH certs for user "foo"
+     │   │   ├── root-cert.pub        --> SSH cert for Teleport cluster "root"
+     │   │   └── leaf-cert.pub        --> SSH cert for Teleport cluster "leaf"
+     │   ├── foo-app                  --> App access certs for user "foo"
+     │   │   ├── root                 --> App access certs for cluster "root"
+     │   │   │   ├── appA-x509.pem    --> TLS cert for app service "appA"
+     │   │   │   └── appB-x509.pem    --> TLS cert for app service "appB"
+     │   │   │   └── appB-localca.pem --> Self-signed localhost CA cert for app service "appB"
+     │   │   └── leaf                 --> App access certs for cluster "leaf"
+     │   │       └── appC-x509.pem    --> TLS cert for app service "appC"
+     │   ├── foo-db                   --> Database access certs for user "foo"
+     │   │   ├── root                 --> Database access certs for cluster "root"
+     │   │   │   ├── dbA-x509.pem     --> TLS cert for database service "dbA"
+     │   │   │   ├── dbB-x509.pem     --> TLS cert for database service "dbB"
+     │   │   │   └── dbC-wallet       --> Oracle Client wallet Configuration directory.
+     │   │   ├── leaf                 --> Database access certs for cluster "leaf"
+     │   │   │   └── dbC-x509.pem     --> TLS cert for database service "dbC"
+     │   │   └── proxy-localca.pem    --> Self-signed TLS Routing local proxy CA
+     │   ├── foo-kube                 --> Kubernetes certs for user "foo"
+     │   |    ├── root                 --> Kubernetes certs for Teleport cluster "root"
+     │   |    │   ├── kubeA-kubeconfig --> standalone kubeconfig for Kubernetes cluster "kubeA"
+     │   |    │   ├── kubeA-x509.pem   --> TLS cert for Kubernetes cluster "kubeA"
+     │   |    │   ├── kubeB-kubeconfig --> standalone kubeconfig for Kubernetes cluster "kubeB"
+     │   |    │   ├── kubeB-x509.pem   --> TLS cert for Kubernetes cluster "kubeB"
+     │   |    │   └── localca.pem      --> Self-signed localhost CA cert for Teleport cluster "root"
+     │   |    └── leaf                 --> Kubernetes certs for Teleport cluster "leaf"
+     │   |        ├── kubeC-kubeconfig --> standalone kubeconfig for Kubernetes cluster "kubeC"
+     │   |        └── kubeC-x509.pem   --> TLS cert for Kubernetes cluster "kubeC"
+     |   └── cas                       --> Trusted clusters certificates
+     |        ├── root.pem             --> TLS CA for teleport cluster "root"
+     |        ├── leaf1.pem            --> TLS CA for teleport cluster "leaf1"
+     |        └── leaf2.pem            --> TLS CA for teleport cluster "leaf2"
+     └── two.example.com               --> Additional proxy host entries follow the same format
+                ...
+```
+
+RPCs such as `GenerateUserCerts` will also need to change to support passing
+both of the public keys along.
+These will remain backward compatible by continuing to use the single public key
+for both protocols if both are not passed.
+
+### HSMs/KMS
+
+We will attempt to use the configured CA algorithms when the CA keys are backed
+by HSMs or KMS services.
+If the specific algorithm is not supported, we will do our best to return an
+informative error message to the user.
+It will be the reponsibility of the Teleport admin to select an algorithm
+supported by their particular HSM/KMS.
 
 ### Backward Compatibility
 
@@ -336,40 +608,27 @@ type so that RSA keys can eventually be rejected when the user is ready.
 A CA rotation will effectively act as the backend migration when changing
 algorithms.
 
-TODO:
+### Remote Clusters
 
-* What impact does the change have on remote clusters?
-* How will changes be rolled out across future versions?
+TODO: figure out compatibility for remote clusters using different algorithms or
+running different Teleport versions.
 
 ### Security
 
-TODO:
+This entire RFD is about improving Teleport's security.
 
-Describe the security considerations for your design doc.
-(Non-exhaustive list below.)
+We are not introducing any new endpoints, CLI commands, or APIs.
 
-* Explore possible attack vectors, explain how to prevent them
-* Explore DDoS and other outage-type attacks
-* If frontend, explore common web vulnerabilities
-* If introducing new attack surfaces (UI, CLI commands, API or gRPC endpoints),
-  consider how they may be abused and how to prevent it
-* If introducing new auth{n,z}, explain their design and consequences
-* If using crypto, show that best practices were used to define it
+All supported algorithms will be reviewed by our internal security team and
+external security auditors.
+
+We will only use Go standard library implementations of crypto algorithms (or
+BoringCrypto if compiled in FIPS mode).
 
 ### UX
 
-TODO:
-
-Describe the UX changes and impact of your design doc.
-(Non-exhaustive list below.)
-
-* Explore UI, CLI and API user experience by diving through common scenarios
-  that users would go through
-* Show UI, CLI and API requests/responses that the user would observe
-* Make error messages actionable, explore common failure modes and how users can
-  recover
-* Consider the UX of configuration changes and their impact on Teleport upgrades
-* Consider the UX scenarios for Cloud users
+New configuration in `teleport.yaml` and `cluster_auth_preference` are described
+above.
 
 ### Proto Specification
 
@@ -379,25 +638,20 @@ Include any `.proto` changes or additions that are necessary for your design.
 
 ### Audit Events
 
-TODO:
-
-Include any new events that are required to audit the behavior
-introduced in your design doc and the criteria required to emit them.
+User login and existing certificate generation events will be supplemented with
+info on the algorithms used by the subject and the CA.
 
 ### Observability
 
-TODO:
+Log messages will be emitted whenever CA keys/certs are generated or rotated,
+including the algorithms used for all new keys.
 
-Describe how you will know the feature is working correctly and with acceptable
-performance. Consider whether you should add new Prometheus metrics, distributed
-tracing, or emit log messages with a particular format to detect errors.
+Audit events will also include the algorithms used.
 
 ### Product Usage
 
-TODO:
-
-Describe how we can determine whether the feature is being adopted. Consider new
-telemetry or usage events.
+We will not add telemetry or usage events, logs and audit events will indicate
+if this feature is being used.
 
 ### Test Plan
 
