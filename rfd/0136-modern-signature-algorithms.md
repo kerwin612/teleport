@@ -25,6 +25,148 @@ Some of the more restrictive security policies are starting to reject RSA2048
 
 ## Details
 
+### Summary
+
+We will introduce a new config to `teleport.yaml` and `cluster_auth_preference`
+to control the key types and signature algorithms used by Teleport CAs and all
+clients and hosts which have certificates issued by those CAs.
+
+This config will default to a `recommended` set of algorithms for each protocol
+chosen by us to balance security, compatibility, and performance.
+We will reserve the right to change this set of `recommended` algorithms when
+either:
+
+* the major version of the auth server's teleport.yaml config changes, or
+* in a major version release of Teleport.
+
+Most Teleport administrators will never need to see or interact with this config
+because they can trust that we will select a vetted set of standards-compliant
+algorithms that are trusted to be secure, and we will not break compatibility
+with internal Teleport components or third-party software unless deemed
+absolutely necessary for security reasons.
+
+Teleport administrators will be able to deviate from the `recommended`
+algorithms when they have a compliance need (they must use a particular
+algorithm) or a compatibility need (one of our selected algorithms is not
+supported by an external softare that interacts with Teleport in their
+deployment).
+
+Here is what the config will look like in its default state:
+
+```yaml
+ca_key_params:
+  user:
+    ssh:
+      algorithm: recommended
+      allowed_subject_algorithms: [recommended]
+    tls:
+      algorithm: recommended
+      allowed_subject_algorithms: [recommended]
+  host:
+    ssh:
+      algorithm: recommended
+      allowed_subject_algorithms: [recommended]
+    tls:
+      algorithm: recommended
+      allowed_subject_algorithms: [recommended]
+  db:
+    tls:
+      algorithm: recommended
+      allowed_subject_algorithms: [recommended]
+  openssh:
+    ssh:
+      algorithm: recommended
+      allowed_subject_algorithms: [recommended]
+  jwt:
+    jwt:
+      algorithm: recommended
+      allowed_subject_algorithms: [recommended]
+  saml_idp:
+    tls:
+      algorithm: recommended
+      allowed_subject_algorithms: [recommended]
+  oidc_idp:
+    jwt:
+      algorithm: recommended
+      allowed_subject_algorithms: [recommended]
+```
+
+You can imagine that if we had this config today, the `recommended` keyword here
+would expand to `RSA2048_PKCS1_SHA(256|512)` for all protocols.
+
+When we are ready to update the defaults (in a major config version or a major
+release) we will update the `recommended` rules to default to the following:
+
+(Note: there will be no actual change to the configuration resource which will
+still show `recommended`, the actual values will be computed within Teleport)
+
+(Reviewers: I need your help confirming if these selections are "good" or
+recommending alternatives)
+
+```yaml
+ca_key_params:
+  user:
+    ssh:
+      algorithm: Ed25519
+      # RSA2048 will initially be allowed for older `tsh` clients that don't
+      # know how to generate Ed25519 certs, and removed in a future major version
+      allowed_subject_algorithms: [Ed25519, RSA2048_PKCS1_SHA512]
+    tls:
+      algorithm: ECDSA_P256_SHA256
+      # RSA2048 will initially be allowed for older `tsh` clients that don't
+      # know how to generate Ed25519 certs, and removed in a future major version
+      allowed_subject_algorithms: [ECDSA_P256_SHA256, RSA2048_PKCS1_SHA256]
+  host:
+    ssh:
+      algorithm: Ed25519
+      # RSA2048 will initially be allowed for older hosts that don't know how to
+      # generate Ed25519 certs, and removed in a future major version
+      allowed_subject_algorithms: [Ed25519, RSA2048_PKCS1_SHA512]
+    tls:
+      algorithm: ECDSA_P256_SHA256
+      # RSA2048 will initially be allowed for older hosts that don't know how to
+      # generate Ed25519 certs, and removed in a future major version
+      allowed_subject_algorithms: [ECDSA_P256_SHA256, RSA2048_PKCS1_SHA256]
+  db:
+    tls:
+      # multiple DBs only support RSA so it will remain the default for now
+      algorithm: RSA3072_PKCS1_SHA256
+      # db certs are often fairly long-lived so we should prefer a larger key
+      # size for them.
+      # We will allow Ed25519 for connections the Proxy makes to Teleport
+      # database services because they are short lived, generated often, and
+      # only used internally within Teleport components.
+      allowed_subject_algorithms: [RSA3072_PKCS1_SHA256, RSA2048_PKCS1_SHA256, Ed25519]
+  openssh:
+    ssh:
+      algorithm: Ed25519
+      # RSA2048 will initially be allowed for older hosts that don't know how to
+      # generate Ed25519 certs, and removed in a future major version
+      allowed_subject_algorithms: [Ed25519, RSA2048_PKCS1_SHA512]
+  jwt:
+    jwt:
+      algorithm: ECDSA_P256_SHA256
+      allowed_subject_algorithms: [ECDSA_P256_SHA256]
+  saml_idp:
+    tls:
+      algorithm: ECDSA_P256_SHA256
+      allowed_subject_algorithms: [ECDSA_P256_SHA256]
+  oidc_idp:
+    jwt:
+      algorithm: ECDSA_P256_SHA256
+      allowed_subject_algorithms: [ECDSA_P256_SHA256]
+```
+
+For backward-compatibility, all certs already signed by trusted CAs will
+continue to be trusted, `allowed_subject_algorithms` can be modified at any time
+without breaking connectivity, and only controls the allowed algorithms used for
+new certificates signed by the CA.
+
+Changing CA `algorithm` values in this config will take effect for:
+
+* new Teleport clusters
+* existing Teleport clusters only after a CA rotation.
+
 ### Algorithms
 
 These algorithms are being considered for support:
@@ -76,7 +218,9 @@ Considerations:
 * ECDSA signatures are faster than RSA signatures.
 * FIPS 186-5 approves all listed options
 * BoringCrypto supports all listed options
-* We could consider supporting the P-384 and P-521 curves for CAs
+* The P-256 curve is the most popular, it is considered to be secure, and it has
+  the broadest support among external tools.
+* We could consider supporting the P-384 and P-521 curves for CAs.
 
 #### EdDSA
 
@@ -141,20 +285,12 @@ uses: user ssh cert signing, user tls cert signing, ssh hosts trust this CA
   * `RSA2048_PKCS1_SHA512`
   * `RSA3072_PKCS1_SHA512`
   * `RSA4096_PKCS1_SHA512`
-* proposed `recommended` SSH algo (non-fips): `Ed25519`
-* proposed `recommended` SSH algo (fips): `ECDSA_P256_SHA256`
 * proposed supported SSH `allowed_subject_algorithms`:
   * `Ed25519`
   * `ECDSA_P256_SHA256`
   * `RSA2048_PKCS1_SHA512`
   * `RSA3072_PKCS1_SHA512`
   * `RSA4096_PKCS1_SHA512`
-* proposed `recommended` SSH `allowed_subject_algorithms` (non-fips):
-  * `Ed25519`
-  * `RSA2048_PKCS1_SHA512`
-* proposed `recommended` SSH `allowed_subject_algorithms` (fips):
-  * `ECDSA_P256_SHA256`
-  * `RSA2048_PKCS1_SHA512`
 * reasoning:
   * `Ed25519` is the current best-in-class for SSH
   * `ECDSA_P256_SHA256` has Go BoringCrypto support
@@ -165,17 +301,12 @@ uses: user ssh cert signing, user tls cert signing, ssh hosts trust this CA
   * `ECDSA_P256_SHA256`
   * `Ed25519`
   * `RSA2048_PKCS1_SHA256`
-* proposed `recommended` TLS algo: `ECDSA_P256_SHA256`
 * proposed supported TLS `allowed_subject_algorithms`:
   * `ECDSA_P256_SHA256`
   * `Ed25519`
   * `RSA2048_PKCS1_SHA512`
   * `RSA3072_PKCS1_SHA512`
   * `RSA4096_PKCS1_SHA512`
-* proposed `recommended` TLS `allowed_subject_algorithms`:
-  * `ECDSA_P256_SHA256`
-  * `Ed25519`
-  * `RSA2048_PKCS1_SHA512`
 * reasoning:
   * `ECDSA_P256_SHA256` has the broadest support among external tools
   * `Ed25519` support is becoming more common and some prefer it
@@ -196,20 +327,12 @@ uses: host ssh cert signing, host tls cert signing, ssh clients trust this CA
   * `RSA2048_PKCS1_SHA512`
   * `RSA3072_PKCS1_SHA512`
   * `RSA4096_PKCS1_SHA512`
-* proposed `recommended` SSH algo (non-fips): `Ed25519`
-* proposed `recommended` SSH algo (fips): `ECDSA_P256_SHA256`
 * proposed supported SSH `allowed_subject_algorithms`:
   * `Ed25519`
   * `ECDSA_P256_SHA256`
   * `RSA2048_PKCS1_SHA512`
   * `RSA3072_PKCS1_SHA512`
   * `RSA4096_PKCS1_SHA512`
-* proposed `recommended` SSH `allowed_subject_algorithms` (non-fips):
-  * `Ed25519`
-  * `RSA2048_PKCS1_SHA512`
-* proposed `recommended` SSH `allowed_subject_algorithms` (fips):
-  * `ECDSA_P256_SHA256`
-  * `RSA2048_PKCS1_SHA512`
 * reasoning:
   * `Ed25519` is the current best-in-class for SSH
   * `ECDSA_P256_SHA256` has Go BoringCrypto support
@@ -220,12 +343,7 @@ uses: host ssh cert signing, host tls cert signing, ssh clients trust this CA
   * `ECDSA_P256_SHA256`
   * `Ed25519`
   * `RSA2048_PKCS1_SHA256`
-* proposed `recommended` TLS algo: `ECDSA_P256_SHA256`
 * proposed supported TLS `allowed_subject_algorithms`:
-  * `ECDSA_P256_SHA256`
-  * `Ed25519`
-  * `RSA2048_PKCS1_SHA256`
-* proposed `recommended` TLS `allowed_subject_algorithms`:
   * `ECDSA_P256_SHA256`
   * `Ed25519`
   * `RSA2048_PKCS1_SHA256`
@@ -251,18 +369,12 @@ uses:
   * `RSA2048_PKCS1_SHA256`
   * `RSA3072_PKCS1_SHA256`
   * `RSA4096_PKCS1_SHA256`
-* proposed `recommended` TLS algo: `RSA3072_PKCS1_SHA256`
 * proposed supported TLS `allowed_subject_algorithms`:
   * `ECDSA_P256_SHA256`
   * `Ed25519`
   * `RSA2048_PKCS1_SHA256`
   * `RSA3072_PKCS1_SHA256`
   * `RSA4096_PKCS1_SHA256`
-* proposed `recommended` TLS `allowed_subject_algorithms`:
-  * `RSA2048_PKCS1_SHA256`
-  * `RSA3072_PKCS1_SHA256`
-  * `ECDSA_P256_SHA256`
-  * `Ed25519`
 * reasoning:
   * some database protocols still require RSA, reduce friction by keeping it as
     the default
@@ -285,16 +397,8 @@ OpenSSH nodes trust this CA.
   * `RSA2048_PKCS1_SHA512`
   * `RSA3072_PKCS1_SHA512`
   * `RSA4096_PKCS1_SHA512`
-* proposed `recommended` SSH algo (non-fips): `Ed25519`
-* proposed `recommended` SSH algo (fips): `ECDSA_P256_SHA256`
 * proposed supported SSH `allowed_subject_algorithms`:
   * `Ed25519`
-  * `ECDSA_P256_SHA256`
-  * `RSA2048_PKCS1_SHA512`
-* proposed `recommended` SSH `allowed_subject_algorithms` (non-fips):
-  * `Ed25519`
-  * `RSA2048_PKCS1_SHA512`
-* proposed `recommended` SSH `allowed_subject_algorithms` (fips):
   * `ECDSA_P256_SHA256`
   * `RSA2048_PKCS1_SHA512`
 * reasoning:
@@ -314,14 +418,10 @@ that verify user JWTs trust this CA
   * `ECDSA_P256_SHA256`
   * `Ed25519`
   * `RSA2048_PKCS1_SHA256`
-* proposed `recommended` algo: `ECDSA_P256_SHA256`
 * proposed supported TLS `allowed_subject_algorithms`:
   * `ECDSA_P256_SHA256`
   * `Ed25519`
   * `RSA2048_PKCS1_SHA256`
-* proposed `recommended` `allowed_subject_algorithms`:
-  * `ECDSA_P256_SHA256`
-  * `Ed25519`
 * reasoning:
   * except RSA, `EDCSA_P256_SHA256` has the broadest support among external tools
   * `Ed25519` support is becoming more common and some people prefer it
@@ -340,14 +440,10 @@ uses: signing JWTs as an OIDC provider.
   * `ECDSA_P256_SHA256`
   * `Ed25519`
   * `RSA2048_PKCS1_SHA256`
-* proposed `recommended` algo: `ECDSA_P256_SHA256`
 * proposed supported TLS `allowed_subject_algorithms`:
   * `ECDSA_P256_SHA256`
   * `Ed25519`
   * `RSA2048_PKCS1_SHA256`
-* proposed `recommended` `allowed_subject_algorithms`:
-  * `ECDSA_P256_SHA256`
-  * `Ed25519`
 * reasoning:
   * except RSA, `EDCSA_P256_SHA256` has the broadest support among external tools
   * `Ed25519` support is becoming more common and some people prefer it
@@ -366,12 +462,7 @@ uses: signing SAML assertions as a SAML provider.
   * `ECDSA_P256_SHA256`
   * `Ed25519`
   * `RSA2048_PKCS1_SHA256`
-* proposed `recommended` TLS algo: `ECDSA_P256_SHA256`
 * proposed supported TLS `allowed_subject_algorithms`:
-  * `ECDSA_P256_SHA256`
-  * `Ed25519`
-  * `RSA2048_PKCS1_SHA256`
-* proposed `recommended` TLS `allowed_subject_algorithms`:
   * `ECDSA_P256_SHA256`
   * `Ed25519`
   * `RSA2048_PKCS1_SHA256`
@@ -423,8 +514,8 @@ auth_service:
           - Ed25519
           - RSA2048_PKCS1_SHA512
       tls:
-        # delete recommended to use Teleport's recommended algorithm for this CA
-        # and protocol
+        # use recommended (the default) to automatically select Teleport's
+        # recommended algorithm for this CA and protocol
         algorithm: recommended
         allowed_subject_algorithms:
           # this will expand to our recommended list of allowed subject
