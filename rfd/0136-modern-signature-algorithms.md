@@ -271,6 +271,37 @@ uses:
     keys for the proxy certs that authenticate to the db service, since these
     are only used internally we should go for Ed25519
 
+#### OpenSSH Host CA
+
+keys: ssh
+
+uses: signs user certs to authenticate to registered OpenSSH nodes, registered
+OpenSSH nodes trust this CA.
+
+* current SSH algo: `RSA2048_PKCS1_SHA512`
+* proposed supported SSH algos:
+  * `Ed25519`
+  * `ECDSA_P256_SHA256`
+  * `RSA2048_PKCS1_SHA512`
+  * `RSA3072_PKCS1_SHA512`
+  * `RSA4096_PKCS1_SHA512`
+* proposed `recommended` SSH algo (non-fips): `Ed25519`
+* proposed `recommended` SSH algo (fips): `ECDSA_P256_SHA256`
+* proposed supported SSH `allowed_subject_algorithms`:
+  * `Ed25519`
+  * `ECDSA_P256_SHA256`
+  * `RSA2048_PKCS1_SHA512`
+* proposed `recommended` SSH `allowed_subject_algorithms` (non-fips):
+  * `Ed25519`
+  * `RSA2048_PKCS1_SHA512`
+* proposed `recommended` SSH `allowed_subject_algorithms` (fips):
+  * `ECDSA_P256_SHA256`
+  * `RSA2048_PKCS1_SHA512`
+* reasoning:
+  * `Ed25519` is the current best-in-class for SSH
+  * `ECDSA_P256_SHA256` has Go BoringCrypto support
+  * some environments still require RSA
+
 #### JWT CA
 
 keys: jwt
@@ -417,6 +448,10 @@ auth_service:
       tls:
         algorithm: recommended
         allowed_subject_algorithms: [recommended]
+    openssh:
+      ssh:
+        algorithm: recommended
+        allowed_subject_algorithms: [recommended]
     jwt:
       jwt:
         algorithm: recommended
@@ -437,16 +472,6 @@ metadata:
   name: cluster-auth-preference
 spec:
   ca_key_params:
-    ca_defaults:
-      ssh:
-        algorithm: recommended # let Teleport choose
-        allowed_subject_algorithms: [recommended]
-      tls:
-        algorithm: recommended # let Teleport choose
-        allowed_subject_algorithms: [recommended]
-      jwt:
-        algorithm: recommended
-        allowed_subject_algorithms: [recommended]
     user:
       ssh:
         algorithm: recommended
@@ -463,6 +488,10 @@ spec:
         allowed_subject_algorithms: [recommended]
     db:
       tls:
+        algorithm: recommended
+        allowed_subject_algorithms: [recommended]
+    openssh:
+      ssh:
         algorithm: recommended
         allowed_subject_algorithms: [recommended]
     jwt:
