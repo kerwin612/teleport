@@ -7,7 +7,9 @@ state: draft
 
 ## Required Approvers
 
-TODO
+* Engineering: (@jakule || @espadolini)
+* Security: (@reedloden || @jentfoo) && Doyensec
+* Product: @klizhentas
 
 ## What
 
