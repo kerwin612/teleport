@@ -35,8 +35,10 @@ import (
 const k8sKindPrefix = "Teleport"
 
 // Add names to this array when adding support to new Teleport resources that could conflict with Kubernetes
-var kubernetesReservedNames = []string{"role"}
-var regexpResourceName = regexp.MustCompile(`^([A-Za-z]+)(V[0-9]+)?$`)
+var (
+	kubernetesReservedNames = []string{"role"}
+	regexpResourceName      = regexp.MustCompile(`^([A-Za-z]+)(V[0-9]+)?$`)
+)
 
 // SchemaGenerator generates the OpenAPI v3 schema from a proto file.
 type SchemaGenerator struct {
