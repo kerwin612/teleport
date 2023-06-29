@@ -245,7 +245,7 @@ Considerations:
   <https://go.googlesource.com/go/+/dev.boringcrypto/src/crypto/tls/boring.go#80>
 * Ed25519 is the only EdDSA curve supported in the Go standard library.
 
-#### Summary
+#### Algorithms Summary
 
 * We are probably forced to continue unconditionally using RSA for database
   certs, I'm assuming this would apply to both client and CA.
@@ -258,6 +258,53 @@ Considerations:
   and secure Ed25519 algorithm for SSH and the widely-suported
   `ECDSA_P256_SHA256` algorithm for TLS. This will also allows to evolve the
   algorithms used for each protocol independently in the future.
+
+### FIPS
+
+When compiled in FIPS mode Teleport uses Go's BoringCrypto library, which does
+not yet support Ed25519.
+Therefore we must have a different set of `recommended` algorithms for FIPS mode:
+
+```yaml
+ca_key_params:
+  user:
+    ssh:
+      algorithm: ECDSA_P256_SHA256
+      allowed_subject_algorithms: [ECDSA_P256_SHA256, RSA2048_PKCS1_SHA512]
+    tls:
+      algorithm: ECDSA_P256_SHA256
+      allowed_subject_algorithms: [ECDSA_P256_SHA256, RSA2048_PKCS1_SHA256]
+  host:
+    ssh:
+      algorithm: ECDSA_P256_SHA256
+      allowed_subject_algorithms: [ECDSA_P256_SHA256, RSA2048_PKCS1_SHA512]
+    tls:
+      algorithm: ECDSA_P256_SHA256
+      allowed_subject_algorithms: [ECDSA_P256_SHA256, RSA2048_PKCS1_SHA256]
+  db:
+    tls:
+      algorithm: RSA3072_PKCS1_SHA256
+      allowed_subject_algorithms: [RSA3072_PKCS1_SHA256, RSA2048_PKCS1_SHA256]
+  openssh:
+    ssh:
+      algorithm: ECDSA_P256_SHA256
+      allowed_subject_algorithms: [ECDSA_P256_SHA256, RSA2048_PKCS1_SHA512]
+  jwt:
+    jwt:
+      algorithm: ECDSA_P256_SHA256
+      allowed_subject_algorithms: [ECDSA_P256_SHA256]
+  saml_idp:
+    tls:
+      algorithm: ECDSA_P256_SHA256
+      allowed_subject_algorithms: [ECDSA_P256_SHA256]
+  oidc_idp:
+    jwt:
+      algorithm: ECDSA_P256_SHA256
+      allowed_subject_algorithms: [ECDSA_P256_SHA256]
+```
+
+TODO: figure out if we need to do any recertification before changing these
+defaults (or even the supported algorithms) for FIPS builds.
 
 ### CAs
 
