@@ -703,12 +703,10 @@ func (s *Server) handleGCPInstances(instances *server.GCPInstances) error {
 		ScriptName:      instances.ScriptName,
 		PublicProxyAddr: instances.PublicProxyAddr,
 	}
-	fmt.Printf("RunRequest: %+v\n", req)
 	return trace.Wrap(s.gcpInstaller.Run(s.ctx, req))
 }
 
 func (s *Server) handleGCPDiscovery() {
-	fmt.Println("handleGCPDiscovery")
 	if err := s.nodeWatcher.WaitInitialization(); err != nil {
 		s.Log.WithError(err).Error("Failed to initialize nodeWatcher.")
 		return

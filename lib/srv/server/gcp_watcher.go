@@ -18,7 +18,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/gravitational/teleport/api/types"
@@ -95,15 +94,12 @@ func (*gcpInstanceFetcher) GetMatchingInstances(_ []types.Server, _ bool) ([]Ins
 }
 
 func (f *gcpInstanceFetcher) GetInstances(ctx context.Context, _ bool) ([]Instances, error) {
-	fmt.Println("getting GCP instances")
 	// Key by project ID, then by zone.
 	instanceMap := make(map[string]map[string][]*gcp.Instance)
-	fmt.Printf("%+v\n", f.GCP)
 	for _, projectID := range f.ProjectIDs {
 		instanceMap[projectID] = make(map[string][]*gcp.Instance)
 		for _, zone := range f.Zones {
 			instanceMap[projectID][zone] = make([]*gcp.Instance, 0)
-			fmt.Println("looking for instances in zone", zone)
 			vms, err := f.GCP.ListInstances(ctx, projectID, zone)
 			if err != nil {
 				return nil, trace.Wrap(err)
@@ -118,7 +114,6 @@ func (f *gcpInstanceFetcher) GetInstances(ctx context.Context, _ bool) ([]Instan
 				}
 				filteredVMs = append(filteredVMs, vm)
 			}
-			fmt.Printf("found %v instances\n", len(filteredVMs))
 			instanceMap[projectID][zone] = filteredVMs
 		}
 	}

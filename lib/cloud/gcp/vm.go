@@ -375,7 +375,6 @@ func (clt *instancesClient) AddSSHKey(ctx context.Context, req *SSHKeyRequest) e
 	if err := req.CheckAndSetDefaults(); err != nil {
 		return trace.Wrap(err)
 	}
-	fmt.Printf("AddSSHKey: %+v %s\n", req, req.PublicKey.Marshal())
 	if req.PublicKey == nil {
 		return trace.BadParameter("public key not set")
 	}
@@ -489,7 +488,6 @@ func RunCommand(ctx context.Context, req *RunCommandRequest) error {
 	if err := req.CheckAndSetDefaults(); err != nil {
 		return trace.Wrap(err)
 	}
-	fmt.Printf("RunCommand: %+v\n", req)
 
 	// Generate keys and add them to the instance.
 	signer, publicKey, err := generateKeyPair()
@@ -497,7 +495,6 @@ func RunCommand(ctx context.Context, req *RunCommandRequest) error {
 		return trace.Wrap(err)
 	}
 	instance, err := req.Client.GetInstance(ctx, &req.InstanceRequest)
-	fmt.Printf("Instance: %+v\n", instance)
 	if err != nil {
 		return trace.Wrap(err)
 	}
@@ -554,7 +551,6 @@ https://cloud.google.com/solutions/connecting-securely#storing_host_keys_by_enab
 		if errors.Is(err, &ssh.ExitError{}) {
 			logrus.Debugf(string(out))
 		}
-		fmt.Println("command finished with error")
 		return trace.Wrap(err)
 	}
 	return nil

@@ -18,7 +18,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/gravitational/trace"
@@ -74,7 +73,6 @@ func (w *Watcher) sendInstancesOrLogError(instancesColl []Instances, err error) 
 // Run starts the watcher's main watch loop.
 func (w *Watcher) Run() {
 	if len(w.fetchers) == 0 {
-		fmt.Println("no fetchers")
 		return
 	}
 	ticker := time.NewTicker(w.pollInterval)
