@@ -1554,6 +1554,146 @@ const (
 	kubeService = "kube_service"
 )
 
+func (a *ServerWithRoles) GetUnifiedResources(ctx context.Context, namespace string) ([]types.ResourceWithLabels, error) {
+	if err := a.action(namespace, types.KindNode, types.VerbList); err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	// Fetch full list of nodes in the backend.
+	startFetch := time.Now()
+	unifiedResources, err := a.authServer.unifiedResourceWatcher.GetUnifiedResources(ctx, namespace)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	elapsedFetch := time.Since(startFetch)
+
+	// Filter resources to return the ones for the connected identity.
+	filteredResources := make([]types.ResourceWithLabels, 0)
+	startFilter := time.Now()
+	for _, resource := range unifiedResources {
+		switch r := resource.(type) {
+		case types.Server:
+			{
+				if err := a.checkAccessToNode(r); err != nil {
+					if trace.IsAccessDenied(err) {
+						continue
+					}
+
+					return nil, trace.Wrap(err)
+				}
+
+				filteredResources = append(filteredResources, resource)
+			}
+		case types.DatabaseServer:
+			{
+				if err := a.checkAccessToDatabase(r.GetDatabase()); err != nil {
+					if trace.IsAccessDenied(err) {
+						continue
+					}
+
+					return nil, trace.Wrap(err)
+				}
+
+				filteredResources = append(filteredResources, resource)
+			}
+
+		case types.AppServer:
+			{
+				if err := a.checkAccessToApp(r.GetApp()); err != nil {
+					if trace.IsAccessDenied(err) {
+						continue
+					}
+
+					return nil, trace.Wrap(err)
+				}
+
+				filteredResources = append(filteredResources, resource)
+			}
+		case types.WindowsDesktop:
+			{
+				if err := a.checkAccessToWindowsDesktop(r); err != nil {
+					if trace.IsAccessDenied(err) {
+						continue
+					}
+
+					return nil, trace.Wrap(err)
+				}
+
+				filteredResources = append(filteredResources, resource)
+			}
+		}
+	}
+	elapsedFilter := time.Since(startFilter)
+
+	log.WithFields(logrus.Fields{
+		"user":           a.context.User.GetName(),
+		"elapsed_fetch":  elapsedFetch,
+		"elapsed_filter": elapsedFilter,
+	}).Debugf(
+		"GetUnifiedResources(%v->%v) in %v.",
+		len(unifiedResources), len(filteredResources), elapsedFetch+elapsedFilter)
+
+	return filteredResources, nil
+}
+
+// ListUnifiedResources
+func (a *ServerWithRoles) ListUnifiedResources(ctx context.Context, req proto.ListUnifiedResourcesRequest) (*types.ListResourcesResponse, error) {
+	unifiedResources, err := a.GetUnifiedResources(ctx, req.Namespace)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	limit := int(req.Limit)
+	var filtered []types.ResourceWithLabels
+	filter := services.MatchResourceFilter{
+		Kinds:               req.Kinds,
+		Labels:              req.Labels,
+		SearchKeywords:      req.SearchKeywords,
+		PredicateExpression: req.PredicateExpression,
+	}
+
+	// Iterate and filter every resource, deduplicating while matching.
+	seenResourceMap := make(map[services.ResourceSeenKey]struct{})
+	for _, resource := range unifiedResources {
+		switch match, err := services.MatchResourceByFilters(resource, filter, seenResourceMap); {
+		case err != nil:
+			return nil, trace.Wrap(err)
+		case !match:
+			continue
+		}
+
+		filtered = append(filtered, resource)
+	}
+
+	totalCount := len(filtered)
+	pageStart := 0
+	pageEnd := limit
+
+	// Trim resources that precede start key.
+	if req.StartKey != "" {
+		for i, resource := range filtered {
+			if backend.GetPaginationKey(resource) == req.StartKey {
+				pageStart = i
+				break
+			}
+		}
+		pageEnd = limit + pageStart
+	}
+
+	var nextKey string
+	if pageEnd >= len(filtered) {
+		pageEnd = len(filtered)
+	} else {
+		nextKey = backend.GetPaginationKey(filtered[pageEnd])
+	}
+
+	return &types.ListResourcesResponse{
+		Resources:  filtered[pageStart:pageEnd],
+		NextKey:    nextKey,
+		TotalCount: totalCount,
+	}, nil
+}
+
 // ListResources returns a paginated list of resources filtered by user access.
 func (a *ServerWithRoles) ListResources(ctx context.Context, req proto.ListResourcesRequest) (*types.ListResourcesResponse, error) {
 	// kubeService is a special resource type that is used to keep compatibility

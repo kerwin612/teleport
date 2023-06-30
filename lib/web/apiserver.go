@@ -629,6 +629,9 @@ func (h *Handler) bindDefaultEndpoints() {
 	// get namespaces
 	h.GET("/webapi/sites/:site/namespaces", h.WithClusterAuth(h.getSiteNamespaces))
 
+	// get unified resources
+	h.GET("/webapi/sites/:site/resources", h.WithClusterAuth(h.clusterUnifiedResourcesGet))
+
 	// get nodes
 	h.GET("/webapi/sites/:site/nodes", h.WithClusterAuth(h.clusterNodesGet))
 
@@ -2425,6 +2428,109 @@ func (h *Handler) getSiteNamespaces(w http.ResponseWriter, r *http.Request, _ ht
 	}
 	return getSiteNamespacesResponse{
 		Namespaces: namespaces,
+	}, nil
+}
+
+func makeUnifiedResourceRequest(r *http.Request) (*proto.ListUnifiedResourcesRequest, error) {
+
+	values := r.URL.Query()
+
+	limit, err := queryLimitAsInt32(values, "limit", defaults.MaxIterationLimit)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	sortBy := types.GetSortByFromString(values.Get("sort"))
+
+	var kinds []string
+	reqKinds := values["kinds"]
+	if len(reqKinds) > 0 && reqKinds[0] != "" {
+		kinds = reqKinds
+	}
+
+	startKey := values.Get("startKey")
+	return &proto.ListUnifiedResourcesRequest{
+		Kinds:               kinds,
+		Limit:               limit,
+		StartKey:            startKey,
+		SortBy:              sortBy,
+		PredicateExpression: values.Get("query"),
+		SearchKeywords:      client.ParseSearchKeywords(values.Get("search"), ' '),
+		UseSearchAsRoles:    values.Get("searchAsRoles") == "yes",
+	}, nil
+}
+
+// clusterUnifiedResourcesGet returns a list of resources for a given cluster site. This includes all resources available to be displayed in the web ui
+// such as Nodes, Apps, Desktops, etc etc
+func (h *Handler) clusterUnifiedResourcesGet(w http.ResponseWriter, r *http.Request, p httprouter.Params, sctx *SessionContext, site reversetunnel.RemoteSite) (interface{}, error) {
+	clt, err := sctx.GetUserClient(r.Context(), site)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	identity, err := sctx.GetIdentity()
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	req, err := makeUnifiedResourceRequest(r)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	// page, err := clt.GetUnifiedResourcePage(r.Context(), clt, req)
+	// if err != nil {
+	// 	return nil, trace.Wrap(err)
+	// }
+
+	accessChecker, err := sctx.GetUserAccessChecker()
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	dbNames, dbUsers, err := getDatabaseUsersAndNames(accessChecker)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	unifiedResources := make([]interface{}, 0)
+	for _, resource := range page.Resources {
+		switch r := resource.(type) {
+		case types.Server:
+			server, err := ui.MakeServer(site.GetName(), r, accessChecker)
+			if err != nil {
+				return nil, trace.Wrap(err)
+			}
+			unifiedResources = append(unifiedResources, server)
+		case types.DatabaseServer:
+			db := ui.MakeDatabase(r.GetDatabase(), dbUsers, dbNames)
+			unifiedResources = append(unifiedResources, db)
+		case types.AppServer:
+			app := ui.MakeApp(ui.MakeAppsConfig{
+				LocalClusterName:  site.GetName(),
+				LocalProxyDNSName: h.proxyDNSName(),
+				AppClusterName:    site.GetName(),
+				Identity:          identity,
+			}, r.GetApp())
+			unifiedResources = append(unifiedResources, app)
+		case types.WindowsDesktop:
+			desktop, err := ui.MakeDesktop(r, accessChecker)
+			if err != nil {
+				return nil, trace.Wrap(err)
+			}
+			unifiedResources = append(unifiedResources, desktop)
+		default:
+			return nil, trace.Errorf("UI Resource has unknown type: %T", resource)
+		}
+	}
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	return listResourcesGetResponse{
+		Items:      unifiedResources,
+		StartKey:   page.NextKey,
+		TotalCount: page.Total,
 	}, nil
 }
 

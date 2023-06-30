@@ -183,7 +183,7 @@ func MatchResourceByFilters(resource types.ResourceWithLabels, filter MatchResou
 
 	var match bool
 
-	if len(filter.Labels) == 0 && len(filter.SearchKeywords) == 0 && filter.PredicateExpression == "" {
+	if len(filter.Labels) == 0 && len(filter.SearchKeywords) == 0 && filter.PredicateExpression == "" && len(filter.Kinds) == 0 {
 		match = true
 	}
 
@@ -219,6 +219,10 @@ func matchResourceByFilters(resource types.ResourceWithLabels, filter MatchResou
 		case !match:
 			return false, nil
 		}
+	}
+
+	if !types.MatchKinds(resource, filter.Kinds) {
+		return false, nil
 	}
 
 	if !types.MatchLabels(resource, filter.Labels) {
@@ -266,6 +270,10 @@ type MatchResourceFilter struct {
 	SearchKeywords []string
 	// PredicateExpression holds boolean conditions that must be matched.
 	PredicateExpression string
+	// Kinds is a list of resourceKinds to be used when doing a unified resource query.
+	// It will filter out any kind not present in the list. If the list is not present or empty
+	// then all kinds are valid and will be returned (still subject to other included filters)
+	Kinds []string
 }
 
 const (

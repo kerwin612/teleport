@@ -4403,6 +4403,105 @@ func (g *GRPCServer) GenerateCertAuthorityCRL(ctx context.Context, req *proto.Ce
 	return &proto.CRL{CRL: crl}, nil
 }
 
+// ListUnifiedResources
+func (g *GRPCServer) ListUnifiedResources(ctx context.Context, req *proto.ListUnifiedResourcesRequest) (*proto.ListUnifiedResourcesResponse, error) {
+	auth, err := g.authenticate(ctx)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	resp, err := auth.ListUnifiedResources(ctx, *req)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	paginatedResources, err := g.makePaginatedResources(resp.Resources)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	return &proto.ListUnifiedResourcesResponse{
+		Resources:  paginatedResources,
+		NextKey:    resp.NextKey,
+		TotalCount: int32(resp.TotalCount),
+	}, nil
+
+}
+
+func (g *GRPCServer) makePaginatedResources(resources []types.ResourceWithLabels) ([]*proto.PaginatedResource, error) {
+	paginatedResources := make([]*proto.PaginatedResource, 0)
+	for _, resource := range resources {
+		switch resource.GetKind() {
+		case types.KindDatabaseServer:
+			database, ok := resource.(*types.DatabaseServerV3)
+			if !ok {
+				return nil, trace.BadParameter("database server has invalid type %T", resource)
+			}
+
+			paginatedResources = append(paginatedResources, &proto.PaginatedResource{Resource: &proto.PaginatedResource_DatabaseServer{DatabaseServer: database}})
+		case types.KindDatabaseService:
+			databaseService, ok := resource.(*types.DatabaseServiceV1)
+			if !ok {
+				return nil, trace.BadParameter("database service has invalid type %T", resource)
+			}
+
+			paginatedResources = append(paginatedResources, &proto.PaginatedResource{Resource: &proto.PaginatedResource_DatabaseService{DatabaseService: databaseService}})
+		case types.KindAppServer:
+			app, ok := resource.(*types.AppServerV3)
+			if !ok {
+				return nil, trace.BadParameter("application server has invalid type %T", resource)
+			}
+
+			paginatedResources = append(paginatedResources, &proto.PaginatedResource{Resource: &proto.PaginatedResource_AppServer{AppServer: app}})
+		case types.KindNode:
+			srv, ok := resource.(*types.ServerV2)
+			if !ok {
+				return nil, trace.BadParameter("node has invalid type %T", resource)
+			}
+
+			paginatedResources = append(paginatedResources, &proto.PaginatedResource{Resource: &proto.PaginatedResource_Node{Node: srv}})
+		case types.KindKubeServer:
+			srv, ok := resource.(*types.KubernetesServerV3)
+			if !ok {
+				return nil, trace.BadParameter("kubernetes server has invalid type %T", resource)
+			}
+
+			paginatedResources = append(paginatedResources, &proto.PaginatedResource{Resource: &proto.PaginatedResource_KubernetesServer{KubernetesServer: srv}})
+		case types.KindWindowsDesktop:
+			desktop, ok := resource.(*types.WindowsDesktopV3)
+			if !ok {
+				return nil, trace.BadParameter("windows desktop has invalid type %T", resource)
+			}
+
+			paginatedResources = append(paginatedResources, &proto.PaginatedResource{Resource: &proto.PaginatedResource_WindowsDesktop{WindowsDesktop: desktop}})
+		case types.KindWindowsDesktopService:
+			desktopService, ok := resource.(*types.WindowsDesktopServiceV3)
+			if !ok {
+				return nil, trace.BadParameter("windows desktop service has invalid type %T", resource)
+			}
+
+			paginatedResources = append(paginatedResources, &proto.PaginatedResource{Resource: &proto.PaginatedResource_WindowsDesktopService{WindowsDesktopService: desktopService}})
+		case types.KindKubernetesCluster:
+			cluster, ok := resource.(*types.KubernetesClusterV3)
+			if !ok {
+				return nil, trace.BadParameter("kubernetes cluster has invalid type %T", resource)
+			}
+
+			paginatedResources = append(paginatedResources, &proto.PaginatedResource{Resource: &proto.PaginatedResource_KubeCluster{KubeCluster: cluster}})
+		case types.KindUserGroup:
+			userGroup, ok := resource.(*types.UserGroupV1)
+			if !ok {
+				return nil, trace.BadParameter("user group has invalid type %T", resource)
+			}
+
+			paginatedResources = append(paginatedResources, &proto.PaginatedResource{Resource: &proto.PaginatedResource_UserGroup{UserGroup: userGroup}})
+		default:
+			return nil, trace.NotImplemented("resource type %s doesn't support pagination", resource.GetKind())
+		}
+	}
+	return paginatedResources, nil
+}
+
 // ListResources retrieves a paginated list of resources.
 func (g *GRPCServer) ListResources(ctx context.Context, req *proto.ListResourcesRequest) (*proto.ListResourcesResponse, error) {
 	auth, err := g.authenticate(ctx)
@@ -4417,82 +4516,15 @@ func (g *GRPCServer) ListResources(ctx context.Context, req *proto.ListResources
 
 	protoResp := &proto.ListResourcesResponse{
 		NextKey:    resp.NextKey,
-		Resources:  make([]*proto.PaginatedResource, len(resp.Resources)),
 		TotalCount: int32(resp.TotalCount),
 	}
 
-	for i, resource := range resp.Resources {
-		var protoResource *proto.PaginatedResource
-		switch req.ResourceType {
-		case types.KindDatabaseServer:
-			database, ok := resource.(*types.DatabaseServerV3)
-			if !ok {
-				return nil, trace.BadParameter("database server has invalid type %T", resource)
-			}
-
-			protoResource = &proto.PaginatedResource{Resource: &proto.PaginatedResource_DatabaseServer{DatabaseServer: database}}
-		case types.KindDatabaseService:
-			databaseService, ok := resource.(*types.DatabaseServiceV1)
-			if !ok {
-				return nil, trace.BadParameter("database service has invalid type %T", resource)
-			}
-
-			protoResource = &proto.PaginatedResource{Resource: &proto.PaginatedResource_DatabaseService{DatabaseService: databaseService}}
-		case types.KindAppServer:
-			app, ok := resource.(*types.AppServerV3)
-			if !ok {
-				return nil, trace.BadParameter("application server has invalid type %T", resource)
-			}
-
-			protoResource = &proto.PaginatedResource{Resource: &proto.PaginatedResource_AppServer{AppServer: app}}
-		case types.KindNode:
-			srv, ok := resource.(*types.ServerV2)
-			if !ok {
-				return nil, trace.BadParameter("node has invalid type %T", resource)
-			}
-
-			protoResource = &proto.PaginatedResource{Resource: &proto.PaginatedResource_Node{Node: srv}}
-		case types.KindKubeServer:
-			srv, ok := resource.(*types.KubernetesServerV3)
-			if !ok {
-				return nil, trace.BadParameter("kubernetes server has invalid type %T", resource)
-			}
-
-			protoResource = &proto.PaginatedResource{Resource: &proto.PaginatedResource_KubernetesServer{KubernetesServer: srv}}
-		case types.KindWindowsDesktop:
-			desktop, ok := resource.(*types.WindowsDesktopV3)
-			if !ok {
-				return nil, trace.BadParameter("windows desktop has invalid type %T", resource)
-			}
-
-			protoResource = &proto.PaginatedResource{Resource: &proto.PaginatedResource_WindowsDesktop{WindowsDesktop: desktop}}
-		case types.KindWindowsDesktopService:
-			desktopService, ok := resource.(*types.WindowsDesktopServiceV3)
-			if !ok {
-				return nil, trace.BadParameter("windows desktop service has invalid type %T", resource)
-			}
-
-			protoResource = &proto.PaginatedResource{Resource: &proto.PaginatedResource_WindowsDesktopService{WindowsDesktopService: desktopService}}
-		case types.KindKubernetesCluster:
-			cluster, ok := resource.(*types.KubernetesClusterV3)
-			if !ok {
-				return nil, trace.BadParameter("kubernetes cluster has invalid type %T", resource)
-			}
-
-			protoResource = &proto.PaginatedResource{Resource: &proto.PaginatedResource_KubeCluster{KubeCluster: cluster}}
-		case types.KindUserGroup:
-			userGroup, ok := resource.(*types.UserGroupV1)
-			if !ok {
-				return nil, trace.BadParameter("user group has invalid type %T", resource)
-			}
-
-			protoResource = &proto.PaginatedResource{Resource: &proto.PaginatedResource_UserGroup{UserGroup: userGroup}}
-		default:
-			return nil, trace.NotImplemented("resource type %s doesn't support pagination", req.ResourceType)
-		}
-
-		protoResp.Resources[i] = protoResource
+	paginatedResources, err := g.makePaginatedResources(resp.Resources)
+	if err != nil {
+		return nil, trace.Wrap(err)
 	}
+
+	protoResp.Resources = paginatedResources
 
 	return protoResp, nil
 }
