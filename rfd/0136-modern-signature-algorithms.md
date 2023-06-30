@@ -303,8 +303,8 @@ ca_key_params:
       allowed_subject_algorithms: [ECDSA_P256_SHA256]
 ```
 
-TODO: figure out if we need to do any recertification before changing these
-defaults (or even the supported algorithms) for FIPS builds.
+TODO: figure out any possible compliance hurdles before changing these defaults
+(or even the supported algorithms) for FIPS builds.
 
 ### CAs
 
@@ -779,8 +779,11 @@ algorithms.
 
 ### Remote Clusters
 
-TODO: figure out compatibility for remote clusters using different algorithms or
-running different Teleport versions.
+Remote clusters may all need to be updated to a version with support for the new
+algorithms before any cluster can begin using a new algorithm.
+This will be tested and documented.
+We will attempt to warn users or prevent them from creating an incompatible
+config when remote clusters are on older Teleport versions.
 
 ### Security
 
@@ -798,6 +801,52 @@ BoringCrypto if compiled in FIPS mode).
 
 New configuration in `teleport.yaml` and `cluster_auth_preference` are described
 above.
+
+We will add visibility of the current and configured CA algorithms to `tctl status`.
+
+```
+$ tctl status
+Cluster      cluster-one
+Version      14.0.0-dev
+
+Host CA pins:
+sha256:d2c825ede608da97891b3eaf1dac27e7e1085be5ff71e48a97ff8eb53360e362
+
+Host CA
+expires:         Jun 21 2033 00:03:19 UTC
+last rotated:    Jun 21 2023 00:03:19 UTC
+rotation state:  standby
+SSH algorithm:   Ed25519
+TLS algorithm:   ECDSA_P256_SHA256
+
+User CA
+expires:         Jun 21 2033 00:03:19 UTC
+last rotated:    never
+rotation state:  standby
+SSH algorithm:   RSA2048_PKCS1_SHA512 (configured algorithm Ed25519 will take effect during next manual CA rotation)
+TLS algorithm:   RSA2048_PKCS1_SHA256 (configured algorithm ECDSA_P256_SHA256 will take effect during next manual CA rotation)
+
+Database CA
+expires:         Jun 21 2033 00:03:19 UTC
+last rotated:    never
+rotation state:  rotating clients (mode: manual, started: Jun 30 2023 00:03:19 UTC, ending: Jul 1 2023 06:03:19 UTC)
+TLS algorithm:   RSA3072_PKCS1_SHA256
+
+...
+```
+
+`tctl auth rotate` will inform users when a rotation is going to trigger an
+algorithm change.
+
+```
+$ tctl auth rotate --manual --type user --phase init
+INFO: Rotation will update the key types for this CA to match configuration:
+Protocol  Before                After
+SSH       RSA2048_PKCS1_SHA512  Ed25519
+TLS       RSA2048_PKCS1_SHA256  ECDSA_P256_SHA256
+
+Updated rotation phase to "init". To check status use 'tctl status'
+```
 
 ### Proto Specification
 
