@@ -27,10 +27,14 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// GCPInstaller handles running commands that install Teleport on GCP
+// virtual machines.
 type GCPInstaller struct {
 	Emitter apievents.Emitter
 }
 
+// GCPRunRequest combines parameters for running commands on a set of GCP
+// virtual machines.
 type GCPRunRequest struct {
 	Client          gcp.InstancesClient
 	Instances       []*gcp.Instance
@@ -41,8 +45,12 @@ type GCPRunRequest struct {
 	PublicProxyAddr string
 }
 
+// Run runs a command on a set of virtual machines and then blocks until the
+// commands have completed.
 func (gi *GCPInstaller) Run(ctx context.Context, req GCPRunRequest) error {
 	g, ctx := errgroup.WithContext(ctx)
+	// Somewhat arbitrary limit to make sure Teleport doesn't have to install
+	// hundreds of nodes at once.
 	g.SetLimit(10)
 
 	for _, inst := range req.Instances {

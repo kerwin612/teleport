@@ -28,15 +28,25 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+// GCPInstances contains information about discovered GCP virtual machines.
 type GCPInstances struct {
-	Zone            string
-	ProjectID       string
-	ScriptName      string
+	// Zone is the instances' zone.
+	Zone string
+	// ProjectID is the instances' project ID.
+	ProjectID string
+	// ScriptName is the name of the script to execute on the instances to
+	// install Teleport.
+	ScriptName string
+	// PublicProxyAddr is the address of the proxy the discovered node should use
+	// to connect to the cluster.
 	PublicProxyAddr string
-	Parameters      []string
-	Instances       []*gcp.Instance
+	// Parameters are the parameters passed to the installation script
+	Parameters []string
+	// Instances is a list of discovered GCP virtual machines.
+	Instances []*gcp.Instance
 }
 
+// NewGCPWatcher creates a new GCP watcher.
 func NewGCPWatcher(ctx context.Context, matchers []types.GCPMatcher, clients cloud.Clients) (*Watcher, error) {
 	cancelCtx, cancelFn := context.WithCancel(ctx)
 	watcher := Watcher{
@@ -93,6 +103,7 @@ func (*gcpInstanceFetcher) GetMatchingInstances(_ []types.Server, _ bool) ([]Ins
 	return nil, trace.NotImplemented("not implemented for gcp fetchers")
 }
 
+// GetInstances fetches all GCP virtual machines matching configured filters.
 func (f *gcpInstanceFetcher) GetInstances(ctx context.Context, _ bool) ([]Instances, error) {
 	// Key by project ID, then by zone.
 	instanceMap := make(map[string]map[string][]*gcp.Instance)

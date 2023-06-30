@@ -129,9 +129,10 @@ type Server struct {
 	// azureInstaller is used to start the installation process on discovered Azure
 	// virtual machines.
 	azureInstaller *server.AzureInstaller
-
+	// gcpWatcher periodically retrieves GCP virtual machines.
 	gcpWatcher *server.Watcher
-
+	// gcpInstaller is used to start the installation process on discovered GCP
+	// virtual machines
 	gcpInstaller *server.GCPInstaller
 	// kubeFetchers holds all kubernetes fetchers for Azure and other clouds.
 	kubeFetchers []common.Fetcher
