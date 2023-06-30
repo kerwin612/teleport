@@ -181,7 +181,7 @@ func New(ctx context.Context, cfg *Config) (*Server, error) {
 
 // initAWSWatchers starts AWS resource watchers based on types provided.
 func (s *Server) initAWSWatchers(matchers []types.AWSMatcher) error {
-	ec2Matchers, otherMatchers := splitAWSMatchers(matchers, func(matcherType string) bool {
+	ec2Matchers, otherMatchers := splitMatchers(matchers, func(matcherType string) bool {
 		return matcherType == services.AWSMatcherEC2
 	})
 
@@ -208,7 +208,7 @@ func (s *Server) initAWSWatchers(matchers []types.AWSMatcher) error {
 	}
 
 	// Add database fetchers.
-	databaseMatchers, otherMatchers := splitAWSMatchers(otherMatchers, db.IsAWSMatcherType)
+	databaseMatchers, otherMatchers := splitMatchers(otherMatchers, db.IsAWSMatcherType)
 	if len(databaseMatchers) > 0 {
 		databaseFetchers, err := db.MakeAWSFetchers(s.ctx, s.Clients, databaseMatchers)
 		if err != nil {
@@ -261,7 +261,7 @@ func (s *Server) initAWSWatchers(matchers []types.AWSMatcher) error {
 
 // initAzureWatchers starts Azure resource watchers based on types provided.
 func (s *Server) initAzureWatchers(ctx context.Context, matchers []types.AzureMatcher) error {
-	vmMatchers, otherMatchers := splitAzureMatchers(matchers, func(matcherType string) bool {
+	vmMatchers, otherMatchers := splitMatchers(matchers, func(matcherType string) bool {
 		return matcherType == services.AzureMatcherVM
 	})
 
@@ -278,7 +278,7 @@ func (s *Server) initAzureWatchers(ctx context.Context, matchers []types.AzureMa
 	}
 
 	// Add database fetchers.
-	databaseMatchers, otherMatchers := splitAzureMatchers(otherMatchers, db.IsAzureMatcherType)
+	databaseMatchers, otherMatchers := splitMatchers(otherMatchers, db.IsAzureMatcherType)
 	if len(databaseMatchers) > 0 {
 		databaseFetchers, err := db.MakeAzureFetchers(s.Clients, databaseMatchers)
 		if err != nil {
@@ -327,7 +327,7 @@ func (s *Server) initGCPWatchers(ctx context.Context, matchers []types.GCPMatche
 		return nil
 	}
 
-	vmMatchers, otherMatchers := splitGCPMatchers(matchers, func(matcherType string) bool {
+	vmMatchers, otherMatchers := splitMatchers(matchers, func(matcherType string) bool {
 		return matcherType == services.GCPMatcherVM
 	})
 
@@ -821,68 +821,19 @@ func splitSlice(ss []string, check func(string) bool) (split, other []string) {
 	return
 }
 
-// splitAWSMatchers splits the AWS matchers by checking the matcher types.
-func splitAWSMatchers(matchers []types.AWSMatcher, matcherTypeCheck func(string) bool) (split, other []types.AWSMatcher) {
+// splitMatchers splits a set of matchers by checking the matcher type.
+func splitMatchers[T types.Matcher](matchers []T, matcherTypeCheck func(string) bool) (split, other []T) {
 	for _, matcher := range matchers {
-		splitTypes, otherTypes := splitSlice(matcher.Types, matcherTypeCheck)
+		splitTypes, otherTypes := splitSlice(matcher.GetTypes(), matcherTypeCheck)
 
 		if len(splitTypes) > 0 {
-			split = append(split, copyAWSMatcherWithNewTypes(matcher, splitTypes))
+			newMatcher := matcher.CopyWithTypes(splitTypes).(T)
+			split = append(split, newMatcher)
 		}
 		if len(otherTypes) > 0 {
-			other = append(other, copyAWSMatcherWithNewTypes(matcher, otherTypes))
+			newMatcher := matcher.CopyWithTypes(otherTypes).(T)
+			other = append(other, newMatcher)
 		}
 	}
 	return
-}
-
-// splitAzureMatchers splits the Azure matchers by checking the matcher types.
-func splitAzureMatchers(matchers []types.AzureMatcher, matcherTypeCheck func(string) bool) (split, other []types.AzureMatcher) {
-	for _, matcher := range matchers {
-		splitTypes, otherTypes := splitSlice(matcher.Types, matcherTypeCheck)
-
-		if len(splitTypes) > 0 {
-			split = append(split, copyAzureMatcherWithNewTypes(matcher, splitTypes))
-		}
-		if len(otherTypes) > 0 {
-			other = append(other, copyAzureMatcherWithNewTypes(matcher, otherTypes))
-		}
-	}
-	return
-}
-
-// splitGCPMatchers splits the GCP matchers by checking the matcher types.
-func splitGCPMatchers(matchers []types.GCPMatcher, matcherTypeCheck func(string) bool) (split, other []types.GCPMatcher) {
-	for _, matcher := range matchers {
-		splitTypes, otherTypes := splitSlice(matcher.Types, matcherTypeCheck)
-
-		if len(splitTypes) > 0 {
-			split = append(split, copyGCPMatcherWithNewTypes(matcher, splitTypes))
-		}
-		if len(otherTypes) > 0 {
-			other = append(other, copyGCPMatcherWithNewTypes(matcher, otherTypes))
-		}
-	}
-	return
-}
-
-// copyAWSMatcherWithNewTypes copies an AWS Matcher and replaces the types with newTypes
-func copyAWSMatcherWithNewTypes(matcher types.AWSMatcher, newTypes []string) types.AWSMatcher {
-	newMatcher := matcher
-	newMatcher.Types = newTypes
-	return newMatcher
-}
-
-// copyAzureMatcherWithNewTypes copies an Azure Matcher and replaces the types with newTypes.
-func copyAzureMatcherWithNewTypes(matcher types.AzureMatcher, newTypes []string) types.AzureMatcher {
-	newMatcher := matcher
-	newMatcher.Types = newTypes
-	return newMatcher
-}
-
-// copyGCPMatcherWithNewTypes copies a GCP Matcher and replaces the types with newTypes.
-func copyGCPMatcherWithNewTypes(matcher types.GCPMatcher, newTypes []string) types.GCPMatcher {
-	newMatcher := matcher
-	newMatcher.Types = newTypes
-	return newMatcher
 }

@@ -85,18 +85,21 @@ type gcpInstanceFetcher struct {
 }
 
 func newGCPInstanceFetcher(cfg gcpFetcherConfig) *gcpInstanceFetcher {
-	return &gcpInstanceFetcher{
+	fetcher := &gcpInstanceFetcher{
 		GCP:             cfg.GCPClient,
 		Zones:           cfg.Matcher.Locations,
 		ProjectIDs:      cfg.Matcher.ProjectIDs,
 		ServiceAccounts: cfg.Matcher.ServiceAccounts,
 		Labels:          cfg.Matcher.Tags,
-		Parameters: map[string]string{
+	}
+	if cfg.Matcher.Params != nil {
+		fetcher.Parameters = map[string]string{
 			"token":           cfg.Matcher.Params.JoinToken,
 			"scriptName":      cfg.Matcher.Params.ScriptName,
 			"publicProxyAddr": cfg.Matcher.Params.PublicProxyAddr,
-		},
+		}
 	}
+	return fetcher
 }
 
 func (*gcpInstanceFetcher) GetMatchingInstances(_ []types.Server, _ bool) ([]Instances, error) {
