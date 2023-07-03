@@ -1848,7 +1848,7 @@ func TestUserGroups(t *testing.T) {
 			return types.NewUserGroup(
 				types.Metadata{
 					Name: name,
-				},
+				}, types.UserGroupSpecV1{},
 			)
 		},
 		create: p.userGroups.CreateUserGroup,
@@ -2514,6 +2514,7 @@ func TestCacheWatchKindExistsInEvents(t *testing.T) {
 		types.KindOktaImportRule:          &types.OktaImportRuleV1{},
 		types.KindOktaAssignment:          &types.OktaAssignmentV1{},
 		types.KindIntegration:             &types.IntegrationV1{},
+		types.KindHeadlessAuthentication:  &types.HeadlessAuthentication{},
 	}
 
 	for name, cfg := range cases {
