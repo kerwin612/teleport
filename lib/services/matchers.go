@@ -182,7 +182,7 @@ func MatchResourceByFilters(resource types.ResourceWithLabels, filter MatchResou
 		case types.AppServer:
 			app := appOrSP.GetApp()
 			specResource = app
-			resourceKey.name = app.GetPublicAddr()
+			resourceKey.name = app.GetName()
 			resourceKey.addr = app.GetPublicAddr()
 		case types.SAMLIdPServiceProvider:
 			specResource = appOrSP

@@ -71,8 +71,8 @@ type MakeAppsConfig struct {
 	AppClusterName string
 	// AppsToUserGroups is a mapping of application names to user groups.
 	AppsToUserGroups map[string]types.UserGroups
-	// AppServersOrSAMLIdPServiceProviders is a list of AppServers or SAMLIdPServiceProviders.
-	AppServerOrSAMLIdPServiceProviders types.AppServersOrSAMLIdPServiceProviders
+	// AppServersAndSAMLIdPServiceProviders is a list of AppServers or SAMLIdPServiceProviders.
+	AppServersAndSAMLIdPServiceProviders types.AppServersOrSAMLIdPServiceProviders
 	// Identity is identity of the logged in user.
 	Identity *tlsca.Identity
 }
@@ -80,7 +80,7 @@ type MakeAppsConfig struct {
 // MakeApps creates application objects (either Application Servers or SAML IdP Service Provider) for the WebUI.
 func MakeApps(c MakeAppsConfig) []App {
 	result := []App{}
-	for _, appOrSP := range c.AppServerOrSAMLIdPServiceProviders {
+	for _, appOrSP := range c.AppServersAndSAMLIdPServiceProviders {
 		if appOrSP.IsAppServer() {
 			app := appOrSP.GetAppServer().GetApp()
 			fqdn := AssembleAppFQDN(c.LocalClusterName, c.LocalProxyDNSName, c.AppClusterName, app)
@@ -97,10 +97,10 @@ func MakeApps(c MakeAppsConfig) []App {
 			}
 
 			resultApp := App{
-				Name:         appOrSP.GetAppOrServiceProviderName(),
-				Description:  appOrSP.GetAppOrServiceProviderDescription(),
+				Name:         appOrSP.GetName(),
+				Description:  appOrSP.GetDescription(),
 				URI:          app.GetURI(),
-				PublicAddr:   appOrSP.GetAppOrServiceProviderPublicAddr(),
+				PublicAddr:   appOrSP.GetPublicAddr(),
 				Labels:       labels,
 				ClusterID:    c.AppClusterName,
 				FQDN:         fqdn,
@@ -119,9 +119,9 @@ func MakeApps(c MakeAppsConfig) []App {
 		} else {
 			labels := makeLabels(appOrSP.GetSAMLIdPServiceProvider().GetAllLabels())
 			resultApp := App{
-				Name:         appOrSP.GetAppOrServiceProviderName(),
-				Description:  appOrSP.GetAppOrServiceProviderDescription(),
-				PublicAddr:   appOrSP.GetAppOrServiceProviderPublicAddr(),
+				Name:         appOrSP.GetName(),
+				Description:  appOrSP.GetDescription(),
+				PublicAddr:   appOrSP.GetPublicAddr(),
 				Labels:       labels,
 				ClusterID:    c.AppClusterName,
 				FriendlyName: services.FriendlyName(appOrSP),

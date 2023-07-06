@@ -152,9 +152,9 @@ type AppServerOrSAMLIdPServiceProvider interface {
 	ResourceWithLabels
 	GetAppServer() *AppServerV3
 	GetSAMLIdPServiceProvider() *SAMLIdPServiceProviderV1
-	GetAppOrServiceProviderName() string
-	GetAppOrServiceProviderDescription() string
-	GetAppOrServiceProviderPublicAddr() string
+	GetName() string
+	GetDescription() string
+	GetPublicAddr() string
 	IsAppServer() bool
 }
 
@@ -163,18 +163,6 @@ const (
 	SAMLIdPServiceProviderDescription = "SAML Application"
 )
 
-// // GetAppServer returns the AppServer in this AppServerOrSAMLIdPServiceProvider.
-// func (a *AppServerOrSAMLIdPServiceProviderV1) GetAppServer() AppServer {
-// 	appOrSP := a.AppServerOrSAMLIdPServiceProvider
-// 	return appOrSP.(AppServer)
-// }
-
-// // GetAppServer returns the GetSAMLIdPServiceProvider in this AppServerOrSAMLIdPServiceProvider.
-// func (a *AppServerOrSAMLIdPServiceProviderV1) GetSAMLIdPServiceProvider() SAMLIdPServiceProvider {
-// 	appOrSP := a.AppServerOrSAMLIdPServiceProvider
-// 	return appOrSP.(SAMLIdPServiceProvider)
-// }
-
 func (a *AppServerOrSAMLIdPServiceProviderV1) GetKind() string {
 	if a.IsAppServer() {
 		return KindSAMLIdPServiceProvider
@@ -182,27 +170,18 @@ func (a *AppServerOrSAMLIdPServiceProviderV1) GetKind() string {
 	return KindAppServer
 }
 
-// GetAppOrServiceProviderName returns the name of either the App or the SAMLIdPServiceProvider, depending on which one
+// GetDescription returns the name of either the App or the SAMLIdPServiceProvider, depending on which one
 // the AppServerOrSAMLIdPServiceProvider holds.
-func (a *AppServerOrSAMLIdPServiceProviderV1) GetAppOrServiceProviderName() string {
-	if a.IsAppServer() {
-		return a.GetAppServer().GetApp().GetName()
-	}
-	return a.GetSAMLIdPServiceProvider().GetName()
-}
-
-// GetAppOrServiceProviderDescription returns the name of either the App or the SAMLIdPServiceProvider, depending on which one
-// the AppServerOrSAMLIdPServiceProvider holds.
-func (a *AppServerOrSAMLIdPServiceProviderV1) GetAppOrServiceProviderDescription() string {
+func (a *AppServerOrSAMLIdPServiceProviderV1) GetDescription() string {
 	if a.IsAppServer() {
 		return a.GetAppServer().GetApp().GetDescription()
 	}
 	return SAMLIdPServiceProviderDescription
 }
 
-// GetAppOrServiceProviderPublicAddr returns the name of either the App or the SAMLIdPServiceProvider, depending on which one
+// GetPublicAddr returns the name of either the App or the SAMLIdPServiceProvider, depending on which one
 // the AppServerOrSAMLIdPServiceProvider holds.
-func (a *AppServerOrSAMLIdPServiceProviderV1) GetAppOrServiceProviderPublicAddr() string {
+func (a *AppServerOrSAMLIdPServiceProviderV1) GetPublicAddr() string {
 	if a.IsAppServer() {
 		return a.GetAppServer().GetApp().GetPublicAddr()
 	}
@@ -243,15 +222,15 @@ func (s AppServersOrSAMLIdPServiceProviders) SortByCustom(sortBy SortBy) error {
 	switch sortBy.Field {
 	case ResourceMetadataName:
 		sort.SliceStable(s, func(i, j int) bool {
-			return stringCompare(s[i].GetAppOrServiceProviderName(), s[j].GetAppOrServiceProviderName(), isDesc)
+			return stringCompare(s[i].GetName(), s[j].GetName(), isDesc)
 		})
 	case ResourceSpecDescription:
 		sort.SliceStable(s, func(i, j int) bool {
-			return stringCompare(s[i].GetAppOrServiceProviderDescription(), s[j].GetAppOrServiceProviderDescription(), isDesc)
+			return stringCompare(s[i].GetDescription(), s[j].GetDescription(), isDesc)
 		})
 	case ResourceSpecPublicAddr:
 		sort.SliceStable(s, func(i, j int) bool {
-			return stringCompare(s[i].GetAppOrServiceProviderPublicAddr(), s[j].GetAppOrServiceProviderPublicAddr(), isDesc)
+			return stringCompare(s[i].GetPublicAddr(), s[j].GetPublicAddr(), isDesc)
 		})
 	default:
 		return trace.NotImplemented("sorting by field %q for resource %q is not supported", sortBy.Field, KindAppAndIdPServiceProvider)
@@ -336,22 +315,16 @@ func (a *AppServerOrSAMLIdPServiceProviderV1) GetMetadata() Metadata {
 // the AppServerOrSAMLIdPServiceProvider holds.
 func (a *AppServerOrSAMLIdPServiceProviderV1) GetName() string {
 	if a.IsAppServer() {
-		appServer := a.GetAppServer()
-		return appServer.Metadata.Name
-	} else {
-		sp := a.GetSAMLIdPServiceProvider()
-		return sp.Metadata.Name
+		return a.GetAppServer().GetApp().GetName()
 	}
+	return a.GetSAMLIdPServiceProvider().GetName()
 }
 
 func (a *AppServerOrSAMLIdPServiceProviderV1) SetName(name string) {
 	if a.IsAppServer() {
-		appServer := a.GetAppServer()
-		appServer.Metadata.Name = name
-	} else {
-		sp := a.GetSAMLIdPServiceProvider()
-		sp.Metadata.Name = name
+		a.GetAppServer().GetApp().SetName(name)
 	}
+	a.GetSAMLIdPServiceProvider().SetName(name)
 }
 
 func (a *AppServerOrSAMLIdPServiceProviderV1) GetResourceID() int64 {

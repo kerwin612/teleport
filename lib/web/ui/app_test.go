@@ -61,7 +61,7 @@ func TestMakeAppsLabelFilter(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			config := MakeAppsConfig{
-				AppServerOrSAMLIdPServiceProviders: tc.AppsOrSPs,
+				AppServersAndSAMLIdPServiceProviders: tc.AppsOrSPs,
 			}
 			apps := MakeApps(config)
 
@@ -160,8 +160,14 @@ func TestMakeApps(t *testing.T) {
 			},
 		},
 		{
-			name:      "saml idp service provider",
-			appsOrSPs: types.AppServersOrSAMLIdPServiceProviders{createAppServerOrSPFromSAMLIdPServiceProvider(&types.SAMLIdPServiceProviderV1{ResourceHeader: types.ResourceHeader{Metadata: types.Metadata{Name: "grafana_saml"}}})},
+			name: "saml idp service provider",
+			appsOrSPs: types.AppServersOrSAMLIdPServiceProviders{createAppServerOrSPFromSAMLIdPServiceProvider(&types.SAMLIdPServiceProviderV1{
+				ResourceHeader: types.ResourceHeader{
+					Metadata: types.Metadata{
+						Name: "grafana_saml",
+					},
+				},
+			})},
 			expected: []App{
 				{
 					Name:        "grafana_saml",
@@ -180,8 +186,8 @@ func TestMakeApps(t *testing.T) {
 			t.Parallel()
 
 			apps := MakeApps(MakeAppsConfig{
-				AppServerOrSAMLIdPServiceProviders: test.appsOrSPs,
-				AppsToUserGroups:                   test.appsToUserGroups,
+				AppServersAndSAMLIdPServiceProviders: test.appsOrSPs,
+				AppsToUserGroups:                     test.appsToUserGroups,
 			})
 
 			require.Empty(t, cmp.Diff(test.expected, apps))
@@ -204,14 +210,26 @@ func newApp(t *testing.T, name, publicAddr, description string, labels map[strin
 
 // createAppServerOrSPFromApp returns a AppServerOrSAMLIdPServiceProvider given an App.
 func createAppServerOrSPFromApp(app types.Application) types.AppServerOrSAMLIdPServiceProvider {
-	appServerOrSP := &types.AppServerOrSAMLIdPServiceProviderV1{AppServerOrSP: &types.AppServerOrSAMLIdPServiceProviderV1_AppServer{AppServer: &types.AppServerV3{Spec: types.AppServerSpecV3{App: app.(*types.AppV3)}}}}
+	appServerOrSP := &types.AppServerOrSAMLIdPServiceProviderV1{
+		AppServerOrSP: &types.AppServerOrSAMLIdPServiceProviderV1_AppServer{
+			AppServer: &types.AppServerV3{
+				Spec: types.AppServerSpecV3{
+					App: app.(*types.AppV3),
+				},
+			},
+		},
+	}
 
 	return appServerOrSP
 }
 
 // createAppServerOrSPFromApp returns a AppServerOrSAMLIdPServiceProvider given a SAMLIdPServiceProvider.
 func createAppServerOrSPFromSAMLIdPServiceProvider(sp types.SAMLIdPServiceProvider) types.AppServerOrSAMLIdPServiceProvider {
-	appServerOrSP := &types.AppServerOrSAMLIdPServiceProviderV1{AppServerOrSP: &types.AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider{SAMLIdPServiceProvider: sp.(*types.SAMLIdPServiceProviderV1)}}
+	appServerOrSP := &types.AppServerOrSAMLIdPServiceProviderV1{
+		AppServerOrSP: &types.AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider{
+			SAMLIdPServiceProvider: sp.(*types.SAMLIdPServiceProviderV1),
+		},
+	}
 
 	return appServerOrSP
 }
