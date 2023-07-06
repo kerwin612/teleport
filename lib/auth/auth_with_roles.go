@@ -4653,11 +4653,20 @@ func (a *ServerWithRoles) GetAppServersAndSAMLIdPServiceProviders(ctx context.Co
 		// Only attempt to list SAMLIdPServiceProviders if the caller has the permission to.
 		if err := a.action(namespace, types.KindAppServer, types.VerbList, types.VerbRead); err == nil {
 			var serviceProviders []types.SAMLIdPServiceProvider
-			var startKey string
-			serviceProviders, startKey, err = a.authServer.ListSAMLIdPServiceProviders(ctx, 3, "")
-			for startKey != "" {
-				serviceProviders, startKey, err = a.authServer.ListSAMLIdPServiceProviders(ctx, 3, startKey)
+			var nextKey string
+			serviceProviders, nextKey, err = a.authServer.ListSAMLIdPServiceProviders(ctx, 2, "")
+			fmt.Printf("\n\n\nTHIS IS THE NEXTKEY RETURNED: \n%s\n\n", nextKey)
+			for nextKey != "" {
+				var additionalServiceProviders []types.SAMLIdPServiceProvider
+				fmt.Printf("\n\nDOING A SEARCH USING THIS nextKey: \n%v\n\n", nextKey)
+				additionalServiceProviders, nextKey, err = a.authServer.ListSAMLIdPServiceProviders(ctx, 2, nextKey)
+				fmt.Printf("\n\n\n ADDITIONAL SERVICEPROVIDERS RETURNED: \n%v\n\n", additionalServiceProviders)
+				if err != nil {
+					return nil, trace.Wrap(err)
+				}
+				serviceProviders = append(serviceProviders, additionalServiceProviders...)
 			}
+			fmt.Printf("\n\nFINAL SERVICEPROVIDERS: \n%v\n\n", serviceProviders)
 			if err != nil {
 				return nil, trace.Wrap(err)
 			}
