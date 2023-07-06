@@ -1663,7 +1663,7 @@ func (a *ServerWithRoles) ListResources(ctx context.Context, req proto.ListResou
 		//   https://github.com/gravitational/teleport/pull/1224
 		actionVerbs = []string{types.VerbList}
 
-	case types.KindDatabaseServer, types.KindDatabaseService, types.KindAppServer, types.KindKubeServer, types.KindWindowsDesktop, types.KindWindowsDesktopService, types.KindUserGroup, types.KindAppAndIdPServiceProvider:
+	case types.KindDatabaseServer, types.KindDatabaseService, types.KindAppServer, types.KindKubeServer, types.KindWindowsDesktop, types.KindWindowsDesktopService, types.KindUserGroup:
 
 	default:
 		return nil, trace.NotImplemented("resource type %s does not support pagination", req.ResourceType)
@@ -4637,28 +4637,39 @@ func (a *ServerWithRoles) GetAppServersAndSAMLIdPServiceProviders(ctx context.Co
 	}
 
 	var appAndSPs []types.AppServerOrSAMLIdPServiceProvider
-	// Add apps to the list, filtering out apps the caller doesn't have access to.
+	// Convert the AppServers to AppServerOrSAMLIdPServiceProviders.
 	for _, appserver := range appservers {
-		err := a.checkAccessToApp(appserver.GetApp())
-		if err != nil && !trace.IsAccessDenied(err) {
-			return nil, trace.Wrap(err)
-		} else if err == nil {
-			appServerV3 := appserver.(*types.AppServerV3)
-			appAndSP := &types.AppServerOrSAMLIdPServiceProviderV1{AppServerOrSP: &types.AppServerOrSAMLIdPServiceProviderV1_AppServer{AppServer: appServerV3}}
-			appAndSPs = append(appAndSPs, appAndSP)
+		appServerV3 := appserver.(*types.AppServerV3)
+		appAndSP := &types.AppServerOrSAMLIdPServiceProviderV1{
+			AppServerOrSP: &types.AppServerOrSAMLIdPServiceProviderV1_AppServer{
+				AppServer: appServerV3,
+			},
 		}
+		appAndSPs = append(appAndSPs, appAndSP)
 	}
 
 	// Only add SAMLIdPServiceProviders to the list if the caller has an enterprise license since this is an enteprise-only feature.
 	if modules.GetModules().BuildType() == modules.BuildEnterprise {
-		serviceProviders, _, err := a.authServer.ListSAMLIdPServiceProviders(ctx, 10000, "")
-		if err != nil {
-			return nil, trace.Wrap(err)
-		}
-		for _, sp := range serviceProviders {
-			spV1 := sp.(*types.SAMLIdPServiceProviderV1)
-			appAndSP := &types.AppServerOrSAMLIdPServiceProviderV1{AppServerOrSP: &types.AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider{SAMLIdPServiceProvider: spV1}}
-			appAndSPs = append(appAndSPs, appAndSP)
+		// Only attempt to list SAMLIdPServiceProviders if the caller has the permission to.
+		if err := a.action(namespace, types.KindAppServer, types.VerbList, types.VerbRead); err == nil {
+			var serviceProviders []types.SAMLIdPServiceProvider
+			var startKey string
+			serviceProviders, startKey, err = a.authServer.ListSAMLIdPServiceProviders(ctx, 3, "")
+			for startKey != "" {
+				serviceProviders, startKey, err = a.authServer.ListSAMLIdPServiceProviders(ctx, 3, startKey)
+			}
+			if err != nil {
+				return nil, trace.Wrap(err)
+			}
+			for _, sp := range serviceProviders {
+				spV1 := sp.(*types.SAMLIdPServiceProviderV1)
+				appAndSP := &types.AppServerOrSAMLIdPServiceProviderV1{
+					AppServerOrSP: &types.AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider{
+						SAMLIdPServiceProvider: spV1,
+					},
+				}
+				appAndSPs = append(appAndSPs, appAndSP)
+			}
 		}
 	}
 

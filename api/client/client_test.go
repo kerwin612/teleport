@@ -358,7 +358,11 @@ func testResources[T types.ResourceWithLabels](resourceType, namespace string) (
 					return nil, trace.Wrap(err)
 				}
 
-				resource := &types.AppServerOrSAMLIdPServiceProviderV1{AppServerOrSP: &types.AppServerOrSAMLIdPServiceProviderV1_AppServer{AppServer: appServer}}
+				resource := &types.AppServerOrSAMLIdPServiceProviderV1{
+					AppServerOrSP: &types.AppServerOrSAMLIdPServiceProviderV1_AppServer{
+						AppServer: appServer,
+					},
+				}
 
 				resources = append(resources, any(resource).(T))
 			} else {
@@ -366,7 +370,11 @@ func testResources[T types.ResourceWithLabels](resourceType, namespace string) (
 					"label": string(make([]byte, labelSize)),
 				}}}}
 
-				resource := &types.AppServerOrSAMLIdPServiceProviderV1{AppServerOrSP: &types.AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider{SAMLIdPServiceProvider: sp}}
+				resource := &types.AppServerOrSAMLIdPServiceProviderV1{
+					AppServerOrSP: &types.AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider{
+						SAMLIdPServiceProvider: sp,
+					},
+				}
 				resources = append(resources, any(resource).(T))
 			}
 		}
