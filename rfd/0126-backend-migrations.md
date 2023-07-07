@@ -40,6 +40,12 @@ leverage feature flags to allow all the changes to land at once and toggle the b
 migration has been completed, the feature flags and old code can be removed. For self-hosted customers migrations should
 still only happen during a major release, which means major/breaking changes should not be backported.
 
+Any Cloud tenants which are lagging behind the current release and are required to jump several versions to land on the
+current release should revert to using recreate instead of a rolling deploy. We can also add a flag that indicates
+migrations should be performed during initialization instead of in the background like during the phased approach. While
+this will negate the changes described in this RFD to eliminate downtime, this kind of jump in releases should be the
+exception and not the norm.
+
 ### Major/Breaking changes
 
 For major breaking changes (i.e., splitting a resource into multiple resources), resources must be migrated to a new
@@ -95,6 +101,31 @@ If a client attempts to update a resource with the new field during a rolling de
 of Auth are running simultaneously there is a 50/50 chance that writes and reads which contain the new field will be
 lossy since the old instance doesn't know about the new field. There are a few ways we can proceed depending on the
 desired outcome.
+
+### Changing the meaning of a field
+
+Altering or extending the capabilities of a field will result in backward compatible behavior. Imagine the following
+resource:
+
+```protobuf
+message Foo {
+  repeated Bar Bars = 1;
+}
+
+message Bar {
+  string Kind = 1;
+  string Namespace = 2;
+  string Name = 3;
+}
+```
+
+Adding a new kind of `Bar` in a newer version will force the old Auth instance to make a decision about how to handle
+unknown Bar kind. This is particularly troublesome when the resource is involved in access decisions. The only
+reasonable decision the old Auth server can make in this case is to deny access to prevent any possible bypasses as a
+result of not knowing how to process the new Bar.
+
+This is also true for extending the supported predicate functions available for any existing field. Older Auth instances
+will be unable to parse the new expression.
 
 #### Permit the lossy behavior
 
