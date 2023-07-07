@@ -3,16 +3,16 @@ authors: Tim Ross (tim.ross@goteleport.com)
 state: draft
 ---
 
-# RFD 126 - Backend Migrations
+# RFD 126 - Resource Migrations
 
 ## Required Approvers
 
-- Engineering @zmb3 && (@fspmarshall || @espadollini )
+- Engineering @zmb3 && (@fspmarshall || @espadolini )
 - Product: ( @klizhentas || @russjones )
 
 ## What
 
-A more reliable and robust mechanism to perform backend migrations.
+Providing support for running different versions of Auth simultaneously.
 
 ## Why
 
@@ -22,65 +22,150 @@ cumbersome and makes the upgrade process a pain point for cluster admins. Scalin
 an [uneven load](https://github.com/gravitational/teleport/issues/7029) which can cause connectivity issues and backend
 latency that can result in a thundering herd.
 
-Migrations to date have existed as a function that is called during Auth initialization. The migration function is left
-as is for a release or two and is then deleted. This makes tracking when and which migrations have been applied
-difficult and prevents skipping any major versions when upgrading since there are no guarantees that the latest version
-will include all the migrations between versions. This also prevents Auth from serving any requests until after all
-migrations have been completed which causes downtime for a cluster.
+Migrations are applied during Auth initialization and prevent the instance from becoming ready and able to serve
+requests which causes downtime. To date, migrations have largely been applied in place on an existing key range, even
+for breaking changes, which prevents an older versions of Auth from operating on the data. This can result in data loss
+as new and older versions try to write different versions of a resource to the same key or worse, rendering older
+versions of Teleport unable to comprehend the data stored in the backend.
 
 ## Details
 
-### Migrations
+Instead of all migrations being a one-shot operation which break compatibility with previous versions of Auth we can
+leverage a phased approach which separates backend changes from application logic changes to allow Auth vN and Auth vN-1
+to coexist. This approach is, however, likely best suited for Cloud where we control the cadence and order of Teleport
+releases that are applied. Self-hosted customers should still follow the traditional upgrade procedure.
 
-Not every backend resource change must be accompanied by a traditional migration that runs during Auth initialization.
-Small additive changes, or converting one field to another may handle the migration lazily on read and write. Larger
-scale changes that alter the shape of the resource like converting a resource to one or many other resources, converting
-a field to a repeated value, or changing how the resource is encoded in the backend should include a direct migration.
+To prevent having to split the changes across separate commits and ensure that they land in the correct release, we can
+leverage feature flags to allow all the changes to land at once and toggle the behavior when appropriate. Once the
+migration has been completed, the feature flags and old code can be removed. For self-hosted customers migrations should
+still only happen during a major release, which means major/breaking changes should not be backported.
 
-### Migrating Keys
+### Major/Breaking changes
 
-All migrations associated with a breaking change MUST not be performed in place, instead these migrations MUST migrate
-both the keys and values in the backend. For example, to migrate the data stored in key `some/path/to/resource/<ID>` we
-must leave the original value at `some/path/to/resource/<ID>` as is and write the migrated value to
-`some/new/path/to/resource/<ID>`. This allows older versions of Teleport to still operate on
-`some/path/to/resource/<ID>`, while newer versions can first attempt reads from `some/new/path/to/resource/<ID>`, and
-fall back to reading from `some/path/to/resource/<ID>` if the migrated key does not exist yet.
-
-Moving data to a new key range and deleting the data from the original key range in the same migration will prevent
-downgrades unless an explicit step is taken to undo the migration. To avoid this scenario a migration may be split into
-two, one that migrates the data to a new key range in and one that deletes the old key range; however the two migrations
-should not exist in the same release. Continuing from the example above, if `some/path/to/resource/<ID>` is migrated to
-`some/new/path/to/resource/<ID>` in v1.0.0 a follow-up migration should be added in v2.0.0 to delete the keys under
-`some/path/to/resource` that were migrated in v1.0.0.
-
-Keys should be versioned to determine which version of a resource exists at any given key range. A key prefix of
-`/type/version/subkind/name` should be used where possible to have uniformity. For example if nodes were migrated from
+For major breaking changes (i.e., splitting a resource into multiple resources), resources must be migrated to a new
+key. For example, to migrate the data stored in `some/path/to/resource/<ID>` we must leave the original value at
+`some/path/to/resource/<ID>` as is, and write the migrated value to `some/new/path/to/resource/<ID>`. Keys should be
+versioned to determine which version of a resource exists at any given key range. A key prefix of
+`/type/version/subkind/name` should be used where possible to have uniformity. For example, if nodes were migrated from
 `/nodes/default/<UUID>` it should be to `/nodes/v2/default/<UUID>`.
 
-### Persistent Migrations
+Any breaking changes to a resource must also bump the API version of the service which interacts with that resource to
+ensure existing code does not break and to make it clear when new clients are choosing to use the new behavior.
 
-All new direct migrations MUST exist in perpetuity to allow for the correct migrations to be applied regardless of which
-version of Teleport is being upgraded from and to. Migrations MUST be numbered and applied in sequence. The order of
-migrations MUST not change and a migration MUST not be altered once it has been included in a release.
+To perform the migration which allows for backward compatibility with the previous version, each step of the migration
+will be done in a phase. Each phase can be gated by a feature flag which is updated to the next phase in the process on
+subsequent Cloud releases. When all the phases have been completed the code can be cleaned up to remove the transitional
+state and feature flags required to get to the target state. The compatibility guarantees of this approach do come with
+a cost though: it will now take longer and require more process to perform the migration. We can however mitigate the
+time required to progress through each phase by increasing the Cloud release cadence.
 
-To make tracking and discovering migrations easier all migrations MUST be placed in `lib/auth/migrations`. Each
-migration should be named `$number-migration-description.go` and contain a single migration. The following is an example
-of four migrations:
+| Phase | Write                  | Read                                        | Details                                                                       |
+| ----- | ---------------------- | ------------------------------------------- | ----------------------------------------------------------------------------- |
+| 1     | Old key AND new key(s) | Old Key                                     | Introduce new resource(s) and mirror data to new key range on write           |
+| 2     | Old key AND new key(s) | New Key, fallback to old key if not present | Start reading from the new key and using the old key as a fall back           |
+| 3     | Old key AND new key(s) | New Key, fallback to old key if not present | Run data migration that copies all keys from old to new                       |
+| 4     | New key(s)             | New Key                                     | Stop mirroring writes and falling back to old resources when they don't exist |
+| 5     | New key(s)             | New Key                                     | Run optional migration that removes all old keys if they do not have a TTL    |
 
+#### Data Migration Phase
+
+Data migrations no longer need to occur during Auth initialization, which will reduce the time it will take a new Auth
+instance to start processing requests. By waiting until Phase 3 to run data migrations when resource mirroring and
+fallback reads are already being performed by all Auth instances the migration can happen in the background.
+
+This phase is only required for resources which do not heartbeat. For any presence related resources we can use the
+write caused by the next heartbeat to perform the data migration.
+
+> The above only applies when doing phased migrations. Major releases used by self-hosted customers will still be using
+> the one-shot migration approach will still require running the migration during initialization.
+
+### Minor/Additive changes
+
+It's quite common to add a new field to an existing resource in order to support a new feature. All additive fields must
+be optional - adding a field which has a required and meaningful default value causes more issues than just lossy reads
+and writes. Since the versions of instances in the cluster may lag behind Auth considerably, any new fields which need
+an explicit default value to operate will cause problems for older agents which will not know about the value; this is
+particularly true for Roles when adding a new field which determines access to a resource. Any new fields should not be
+automatically populated by Teleport and instead should require explicit user input to be populated. Meaning, when a new
+field is added to an existing resource its `CheckAndSetDefaults` or an equivalent method must not be updated to detect
+if the field is empty and provide a default value. Instead, that new field should stay empty until a user explicitly
+sets it via `tctl edit` or some other equivalent means.
+
+If a client attempts to update a resource with the new field during a rolling deploy when both the old and new versions
+of Auth are running simultaneously there is a 50/50 chance that writes and reads which contain the new field will be
+lossy since the old instance doesn't know about the new field. There are a few ways we can proceed depending on the
+desired outcome.
+
+#### Permit the lossy behavior
+
+If Auth doesn't fully understand the new resource, then nothing else in the cluster will either, so even if the write
+succeeds the new resource will very likely not be understood by any agents in the cluster. A write which uses a new
+optional field before the release is fully rolled out to Cloud requires two things:
+
+1. A client consuming a version of `api` that contains the new field
+2. Knowledge that the new field exists
+
+If Cloud is deploying as described in `RFD 134: Cloud first deployments` then that would require a user to either build
+`tctl` off master or pull the newest Cloud version of `tctl` prior to Cloud rolling out that version. If we also assume
+that client automatic upgrades as mentioned in RFD 134 are in place the latter scenario becomes less likely.
+
+Most users will only discover the new field by consuming documentation or examples. To reduce the chance of discovering
+resource changes prior to being rolled out we could delay publishing any updated documentation for the changes until
+after Cloud has rolled out the release to the control plane.
+
+#### Reject any requests which have `baz` populated
+
+```go
+func (g *GRPCServer) UpsertFoo(ctx context.Context, f *Foo) (*emptypb.Empty, error) {
+	if f.baz != "" && !fooBazFieldEnabled {
+		return &emptypb.Empty{}, trace.BadParameter("baz cannot be safely stored")
+	}
+	...
+	return &emptypb.Empty{}, nil
+}
 ```
-./lib/auth/migrations/
-├── 0001-initial_migration.go
-├── 0002-another_migration.go
-├── 0003-some_other_migration.go
-└── 0004-yet_another_migration.go
+
+The downside to this approach is that only new versions of Auth know to reject the request, any older versions will
+process the request while silently dropping the unknown field. This could lead to confusion when half the requests are
+rejected and half of the requests don't end up storing the expected value.
+
+#### Always store the default value when `baz` is populated
+
+```go
+func (g *GRPCServer) UpsertFoo(ctx context.Context, f *Foo) (*emptypb.Empty, error) {
+	if !fooBazFieldEnabled {
+		f.baz = ""
+	}
+	...
+	return &emptypb.Empty{}, nil
+}
 ```
 
-Migration history is to be stored in the backend to enable tracking which migrations have been applied, when, and
-whether they were successful or not. The key `/migrations/<migration_number>` will store the history of a migration.
+This scenario unifies the behavior of new and old versions of Auth but may still cause confusion.
 
-Cluster admins may view the migration history via `tctl migrations ls`.
+#### Separate API and storage objects
 
-### Option 1: Stricter Resource Versioning
+By storing the API object directly in the backend it's not possible to make a change to the storage resource without it
+immediately being available to consumers of the `api` module. Which means as soon as the resource change lands in a
+release that tctl and tsh will have the ability to try to use it. If the representation of the resource stored in the
+backend was a completely separate object from the API object the backend storage changes could be made first and the API
+representation of the resource could only be changed once it was safe for clients to do so.
+
+### Alternate Options Considered
+
+#### Disallow unknown fields
+
+We can explicitly opt-in to rejecting any backend reads or RPC requests which have unknown fields. Backend reads can
+determine unknown if a stored resource has unknown fields by enabling `DisallowUnknownFields` on the json decoder. RPC
+requests can try to identify unknown fields by inspecting the `XXX_unrecognized` field from each message in the request.
+
+Examining the `XXX_unrecognized` may also falsely identify an unknown field if an item was reserved and removed from a
+message instead of being deprecated and left in place. Using stricter json decoding would also cause issues with
+rollbacks since any backend resource with an unknown field would be unable to be unmarshalled from the stored
+representation. This would also break any agents or clients running a newer version of teleport than the Auth service
+since they may have a version of `api` that contains updated proto messages.
+
+#### Stricter Resource Versioning
 
 Without a more concrete strategy for resource versioning, it is impossible to have different versions of Auth running
 concurrently. Auth needs to be aware of the exact version of a resource that clients are requesting to determine if the
@@ -101,7 +186,7 @@ We need to ensure that:
 4. Migrations are always applied in the correct order and are not skipped.
 5. Migrations can be rolled back without having to manually edit the backend.
 
-#### Resource versioning
+##### Resource versioning
 
 The version of a resource MUST be bumped when changes are made to it. Any changes to a resource which can be converted
 into the previous version and do not cause any backward compatibility issues with older Teleport instances only need to
@@ -216,7 +301,7 @@ scenarios in which the resource version may vary along a request route and what 
 
 </details>
 
-#### Optimistic Locking
+##### Optimistic Locking
 
 The backend will be updated to support optimistic locking in order to prevent two simultaneous writes to a resource from
 overwriting one another. The resource metadata shall have a new `Revision` field that will include a backend specific
@@ -277,16 +362,14 @@ type Backend interface {
 
 </details>
 
-#### Migration Strategy
+##### Migration Strategy
 
 In addition to migrating keys as outlined above, when a migration converts a resource at the new key, the corresponding
 resource at the old key must also have its version appended with `+downgraded`. For example converting a resource at
 v1.1 to v2 via a migration should update the old resource to now have a version of `v1.1+downgraded`. This is an
 indication to older Auth servers that the resource is now read only.
 
-#### Implementation Details
-
-##### Auth Initialization
+###### Implementation Details
 
 Every time Auth starts it will evaluate all known migrations against the cluster migration history and apply any
 outstanding migrations. This will allow clusters to skip major versions when upgrading and still have the correct
@@ -440,50 +523,14 @@ downgrading resources. This will reduce the burden on each custom backend servic
 opt in to the new behavior a resources backend service just needs to ensure that it is using the
 `lib/services/generic.Service`.
 
-### Option 2: Phased Migrations
-
-We can separate a backend migration from any application logic that depends on it into two subsequent releases so that
-by the time the application logic is reading/writing to/from a migrated resource all versions of Auth will already have
-the same understanding of the resource. Smaller changes that can be lazily migrated on read/write can be achieved in a
-smaller number of steps than a larger change which requires a direct migration but both are still possible to achieve.
-
-<details open><summary>Lazy Migration Phases</summary>
-
-- v1: Make changes to resource
-- v2: Add application code that lazily migrates on read/write and uses default value where possible
-
-</details>
-
-<details open><summary>Direct Migration Phases</summary>
-
-- v1: Make changes to resource. Write: to both new and old resources. Read: old resource.
-- v2: Add a direct migration that copies all old resource to new resource. Write: to both new and old resources. Read:
-  new resource.
-- v3: Write: new resource. Read: old resource
-- v4: Add a direct migration that deletes all old resources. Write: new resource. Read: old resource
-
-</details>
-
-This approach is much better suited for Cloud where updates are within our control and can be applied much more
-frequently. Since we cannot guarantee that self hosted users always update in order, we can ensure that both the
-migration and the application logic land in the same major release and advise them to proceed with the legacy upgrade
-strategy of scaling down to a single auth server. Though, there may still be issues on Cloud if a tenant is held back
-from upgrading for a period of time and then wants to be on the latest version. In this scenario we can toggle the
-feature flag to disable rolling auth updates so that the legacy upgrade strategy is followed as well. There may be some
-additional down time in this scenario but it should be the exception and not the norm.
-
-The biggest shift with this approach will be in our developer experience. When implementing a new feature that requires
-a migration it is imperative to not include any application logic that relies on the new resource representation in the
-same Cloud release, but, they must exist in the same major version of self hosted releases.
-
-### Option 3: Deferred Migrations
+#### Deferred Migrations
 
 To prevent any migrations from impacting older versions of Teleport we can defer execution of migrations until all
 versions of Auth are running a version which understands the migration. Determining peer versions is not possible today,
 but could be done via monitoring Auth resources within Auth and waiting until all older versions disappear. Detection of
-old Auth servers may take some time and not be a reliable picture of the cluster if heartbeats are stale, or a new
-Auth server was only online long enough to heartbeat and then was terminated. Without an Auth peering mechanism
-detection of different Auth instances within a cluster may not be reliable.
+old Auth servers may take some time and not be a reliable picture of the cluster if heartbeats are stale, or a new Auth
+server was only online long enough to heartbeat and then was terminated. Without an Auth peering mechanism detection of
+different Auth instances within a cluster may not be reliable.
 
 We could pursue a Cloud only variant of this strategy which relies on the Tenant Operator to signal to Auth when all
 older versions of Auth have been terminated. However, there is currently no control interface that allows Tenant
@@ -491,10 +538,10 @@ Operator to communicate with Teleport Auth or Proxy. We could use signals, howev
 real-time signal since Teleport already consumes all of the standard signals for other purposes. To avoid putting
 pressure on kubernetes we should avoid anything that requires "kube exec" as this won't scale well.
 
-This strategy also does not prevent application logic from having to be aware of both the old and new resources since there
-is no guarantee that the migrations will be executed immediately. Any new features which rely on the new resource will either
-temporarily not function or need a compatibility mode to prevent the new application logic from kicking in until the migration
-has completed.
+This strategy also does not prevent application logic from having to be aware of both the old and new resources since
+there is no guarantee that the migrations will be executed immediately. Any new features which rely on the new resource
+will either temporarily not function or need a compatibility mode to prevent the new application logic from kicking in
+until the migration has completed.
 
 ### Backward Compatibility
 
@@ -502,16 +549,7 @@ Migrations have historically been backward incompatible operations. Migrations a
 changing the key or resource version, which can prevent any versions prior to the migration from being able to unmarshal
 the value into the correct representation. The only way to downgrade in this scenario was to restore the backend from a
 backup prior to the migration, attempt to manually roll back the migration, or deleting the entire key range that was
-migrated.
-
-To rollback a migration we can either add a `tctl migrations down <number_of_versions>` that will perform the `Down`
-migration on the last provided number of versions. If the current migration value is 3 and a user ran
-`tctl migrations down 2` then both migration 3 and 2 would be rolled back and leave migration 1 as the current version.
-This is potentially dangerous though because Auth may be running and expecting that certain migrations exits. Another
-option would be to add `teleport migrations down <number_of_versions>` which functioned the same as the `tctl` variation
-except that would be meant to run when Auth is not running. It would start Teleport, perform the migrations, and then
-exit. So if a user upgraded their cluster and something broke during the automatic migrations applied in that version
-they could stop Auth, run `teleport migrations down`, and then start Auth at the previous Teleport version.
+migrated. By using the phased approach we can guarantee that no two subsequent releases of Teleport are incompatible.
 
 ### Testing Migrations
 
@@ -533,120 +571,9 @@ a rollback is possible. Ensuring that Auth running with the migration and all ot
 also crucial to test since Auth is always the first component updated. If the migration is unknown by the agents it
 should not impact their ability to operate.
 
-It can also be a worthwhile exercise to run through the same testing matrix above for any backend changes that require a
-direct migration. Even adding a new field to an existing resource can have
-[drastic consequences](https://github.com/gravitational/teleport/issues/25644) if the previous version cannot unmarshal
-the unknown field. A mixed fleet with agents running an older version of Teleport than Auth can also result in undefined
-behavior new fields in a resource have an impact on business logic.
-
 ### Security
 
-Migrations already exist today, this RFD only proposes a way to make them deterministic and elevates visibility into
-migration history. Only users with the correct permissions will be able to invoke `tctl migrations apply` and in most
-cases the command should result in a no-op. We will also only allow a single migration process to be in flight at any
-given time.
-
-### UX
-
-Cluster admins will have a much simpler and straightforward upgrade procedure to follow which should help reduce some of
-the support load. Performing migrations in a way that eliminates the need to change the number of Auth replicas should
-also result in a more stable cluster during and after upgrades.
-
-This should have the biggest impact on Cloud tenants that experience some outages during upgrades. By allowing multiple
-instances of Auth to exist during an upgrade event we will be able to reduce downtime experienced by users.
-
-`tctl migrations ls` and `tctl migrations apply` will be added to allow admins to inspect the status of the migrations
-and to retry applying migrations in the event that one fails.
-
-### Proto Specification
-
-<details open><summary>MigrationService</summary>
-
-```proto
-// MigrationService provides methods to view migration history and rerun any
-// failed migrations without having to restart Auth.
-service MigrationService {
-  // ListMigrations returns the migration history of the cluster.
-  rpc ListMigrations(ListMigrationsRequest) returns (ListMigrationssResponse);
-  // ApplyMigrations causes migrations to be applied. If all migrations are
-  // applied this is a no-op. This should only be used to cause migrations to
-  // be rerun after resolving any issues that occurred during an automatic
-  // migration from Auth initialization.
-  rpc ApplyMigrations(ApplyMigrationsRequest) returns (google.protobuf.Empty);
-}
-
-// Request for ListMigrations.
-//
-// Follows the pagination semantics of
-// https://cloud.google.com/apis/design/standard_methods#list.
-message ListMigrationsRequest {
-  // The maximum number of items to return.
-  // The server may impose a different page size at its discretion.
-  int32 page_size = 1;
-
-  // The next_page_token value returned from a previous ListMigrationsRequest, if any.
-  string page_token = 2;
-}
-
-// Request for ApplyMigrations.
-message ApplyMigrationsRequest {}
-
-// Response for ListMigrations.
-message ListMigrationssResponse {
-   // A batch of migrations from the request range.
-   repeated Migration migrations = 1;
-
-   // Token to retrieve the next page of results, or empty if there are no
-   // more results in the list.
-   string next_page_token = 2;
-}
-
-// Migration represents the status of a backend migration.
-message Migration {
-  // Kind is the resource kind
-  string kind = 1;
-  // SubKind is an optional resource subkind
-  string sub_kind = 2;
-  // Version is version
-  string version = 3;
-  // Metadata is resource metadata
-  Metadata metadata = 4;
-
-  // The number of the migration.
-  number int = 5;
-  // The timestamp that the migration was applied on.
-  google.protobuf.Timestamp started_at = 6;
-  // The timestamp that the migration finished executing.
-  google.protobuf.Timestamp completed_at = 7;
-  // Whether the outcome of the migration was successful.
-  bool success = 8;
-  // A friendly message that describes the output of the migration.
-  // If the migration failed it will contain the error, if the migration
-  // was applied cleanly it will contain "success".
-  string message = 9;
-}
-```
-
-</details>
-
-### Audit Events
-
-Audit events will be emitted when a migration is started and when it is completed:
-
-- `TMI001I` / MigrationStart
-- `TMI002I` / MigrationComplete
-- `TMI002W` / MigrationFailure
-
-<details open><summary>Event definition</summary>
-
-```proto
-message MigrationEvent {
-  Metadata metadata = 1;
-  Status status = 2;
-  int migration = 3;
-  bool manual = 4;
-}
-```
+Migrations already exist today, this RFD only proposes a way to make them backward compatible.
 
 ### Observability
 
