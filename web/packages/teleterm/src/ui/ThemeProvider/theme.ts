@@ -16,13 +16,13 @@ limitations under the License.
 
 import { fonts } from 'design/theme/fonts';
 import {
-  darkTheme as designDarkTheme,
+  extraTheme as designDarkTheme,
   lightTheme as designLightTheme,
 } from 'design/theme';
 
 const sansSerif = 'system-ui';
 
-export const darkTheme = {
+export const extraTheme = {
   ...designDarkTheme,
   font: sansSerif,
   fonts: {

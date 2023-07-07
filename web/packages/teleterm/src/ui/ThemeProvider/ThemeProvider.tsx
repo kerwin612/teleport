@@ -23,7 +23,7 @@ import {
 import { useAppContext } from 'teleterm/ui/appContextProvider';
 
 import { GlobalStyle } from './globals';
-import { darkTheme, lightTheme } from './theme';
+import { lightTheme, extraTheme } from './theme';
 
 export const ThemeProvider = (props: React.PropsWithChildren<unknown>) => {
   // Listening to Electron's nativeTheme.on('updated') is a workaround.
@@ -38,13 +38,13 @@ export const ThemeProvider = (props: React.PropsWithChildren<unknown>) => {
   // https://github.com/electron/electron/issues/33635#issuecomment-1502215450
   const ctx = useAppContext();
   const [activeTheme, setActiveTheme] = useState(() =>
-    ctx.mainProcessClient.shouldUseDarkColors() ? darkTheme : lightTheme
+    ctx.mainProcessClient.shouldUseDarkColors() ? extraTheme : lightTheme
   );
 
   useEffect(() => {
     const { cleanup } = ctx.mainProcessClient.subscribeToNativeThemeUpdate(
       ({ shouldUseDarkColors }) => {
-        setActiveTheme(shouldUseDarkColors ? darkTheme : lightTheme);
+        setActiveTheme(shouldUseDarkColors ? extraTheme : lightTheme);
       }
     );
 

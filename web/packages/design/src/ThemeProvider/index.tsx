@@ -24,12 +24,12 @@ import storage, { KeysEnum } from 'teleport/services/localStorage';
 
 import { ThemePreference } from 'teleport/services/userPreferences/types';
 
-import { darkTheme, lightTheme } from '../theme';
+import { extraTheme, lightTheme } from '../theme';
 
 import { GlobalStyle } from './globals';
 
 function themePreferenceToTheme(themePreference: ThemePreference) {
-  return themePreference === ThemePreference.Light ? lightTheme : darkTheme;
+  return themePreference === ThemePreference.Light ? lightTheme : extraTheme;
 }
 
 const ThemeProvider = props => {
