@@ -4507,7 +4507,7 @@ func (g *GRPCServer) ListResources(ctx context.Context, req *proto.ListResources
 				protoResource = &proto.PaginatedResource{
 					Resource: &proto.PaginatedResource_AppServerOrSAMLIdPServiceProvider{
 						AppServerOrSAMLIdPServiceProvider: &types.AppServerOrSAMLIdPServiceProviderV1{
-							AppServerOrSP: &types.AppServerOrSAMLIdPServiceProviderV1_AppServer{
+							Resource: &types.AppServerOrSAMLIdPServiceProviderV1_AppServer{
 								AppServer: appOrSP,
 							},
 						},
@@ -4516,7 +4516,7 @@ func (g *GRPCServer) ListResources(ctx context.Context, req *proto.ListResources
 				protoResource = &proto.PaginatedResource{
 					Resource: &proto.PaginatedResource_AppServerOrSAMLIdPServiceProvider{
 						AppServerOrSAMLIdPServiceProvider: &types.AppServerOrSAMLIdPServiceProviderV1{
-							AppServerOrSP: &types.AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider{
+							Resource: &types.AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider{
 								SAMLIdPServiceProvider: appOrSP,
 							},
 						},

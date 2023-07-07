@@ -4654,22 +4654,22 @@ func (a *ServerWithRoles) GetAppServersAndSAMLIdPServiceProviders(ctx context.Co
 		return nil, trace.Wrap(err)
 	}
 
-	var appAndSPs []types.AppServerOrSAMLIdPServiceProvider
+	var appsAndSPs []types.AppServerOrSAMLIdPServiceProvider
 	// Convert the AppServers to AppServerOrSAMLIdPServiceProviders.
 	for _, appserver := range appservers {
 		appServerV3 := appserver.(*types.AppServerV3)
 		appAndSP := &types.AppServerOrSAMLIdPServiceProviderV1{
-			AppServerOrSP: &types.AppServerOrSAMLIdPServiceProviderV1_AppServer{
+			Resource: &types.AppServerOrSAMLIdPServiceProviderV1_AppServer{
 				AppServer: appServerV3,
 			},
 		}
-		appAndSPs = append(appAndSPs, appAndSP)
+		appsAndSPs = append(appsAndSPs, appAndSP)
 	}
 
 	// Only add SAMLIdPServiceProviders to the list if the caller has an enterprise license since this is an enteprise-only feature.
 	if modules.GetModules().BuildType() == modules.BuildEnterprise {
 		// Only attempt to list SAMLIdPServiceProviders if the caller has the permission to.
-		if err := a.action(namespace, types.KindSAMLIdPServiceProvider, types.VerbList, types.VerbRead); err == nil {
+		if err := a.action(namespace, types.KindSAMLIdPServiceProvider, types.VerbList); err == nil {
 			serviceProviders, _, err := a.authServer.ListSAMLIdPServiceProviders(ctx, 0, "")
 			if err != nil {
 				return nil, trace.Wrap(err)
@@ -4677,16 +4677,16 @@ func (a *ServerWithRoles) GetAppServersAndSAMLIdPServiceProviders(ctx context.Co
 			for _, sp := range serviceProviders {
 				spV1 := sp.(*types.SAMLIdPServiceProviderV1)
 				appAndSP := &types.AppServerOrSAMLIdPServiceProviderV1{
-					AppServerOrSP: &types.AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider{
+					Resource: &types.AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider{
 						SAMLIdPServiceProvider: spV1,
 					},
 				}
-				appAndSPs = append(appAndSPs, appAndSP)
+				appsAndSPs = append(appsAndSPs, appAndSP)
 			}
 		}
 	}
 
-	return appAndSPs, nil
+	return appsAndSPs, nil
 }
 
 // UpsertApplicationServer registers an application server.

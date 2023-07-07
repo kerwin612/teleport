@@ -146,9 +146,7 @@ func (s SAMLIdPServiceProviders) Less(i, j int) bool { return s[i].GetName() < s
 // Swap swaps two service providers.
 func (s SAMLIdPServiceProviders) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
-// AppServerOrSAMLIdPServiceProvider holds either an AppServer or a SAMLIdPServiceProvider resource (never both).
-// This is the resource used for WebUI requests to list Applications since we want to list both AppServers and
-// SAMLIdPServiceProviders in the UI.
+// AppServerOrSAMLIdPServiceProvider describes methods shared between an AppServer and a SAMLIdpServiceProvider resource.
 type AppServerOrSAMLIdPServiceProvider interface {
 	ResourceWithLabels
 	GetAppServer() *AppServerV3
@@ -160,7 +158,7 @@ type AppServerOrSAMLIdPServiceProvider interface {
 }
 
 const (
-	// This is the `Description` of a SAML IdP Service Provider to show when listing it in the WebUI.
+	// SAMLIdPServiceProviderDescription is a static description for SAMLIdpServiceProvider resources since the resource itself does not supply its own description.
 	SAMLIdPServiceProviderDescription = "SAML Application"
 )
 
@@ -171,8 +169,7 @@ func (a *AppServerOrSAMLIdPServiceProviderV1) GetKind() string {
 	return KindAppServer
 }
 
-// GetDescription returns the name of either the App or the SAMLIdPServiceProvider, depending on which one
-// the AppServerOrSAMLIdPServiceProvider holds.
+// GetDescription returns the description of either the App or the SAMLIdPServiceProvider.
 func (a *AppServerOrSAMLIdPServiceProviderV1) GetDescription() string {
 	if a.IsAppServer() {
 		return a.GetAppServer().GetApp().GetDescription()
@@ -180,8 +177,7 @@ func (a *AppServerOrSAMLIdPServiceProviderV1) GetDescription() string {
 	return SAMLIdPServiceProviderDescription
 }
 
-// GetPublicAddr returns the name of either the App or the SAMLIdPServiceProvider, depending on which one
-// the AppServerOrSAMLIdPServiceProvider holds.
+// GetDescription returns the public address of either the App or the SAMLIdPServiceProvider.
 func (a *AppServerOrSAMLIdPServiceProviderV1) GetPublicAddr() string {
 	if a.IsAppServer() {
 		return a.GetAppServer().GetApp().GetPublicAddr()
@@ -190,15 +186,14 @@ func (a *AppServerOrSAMLIdPServiceProviderV1) GetPublicAddr() string {
 	return ""
 }
 
-// IsAppServer returns a bool that determines whether this AppServerOrSAMLIdPServiceProvider holds an AppServer.
-// If it is false, it means it holds a SAMLIdPServiceProvider instead.
+// IsAppServer returns true if this AppServerOrSAMLIdPServiceProviderV1 represents an AppServer.
 func (a *AppServerOrSAMLIdPServiceProviderV1) IsAppServer() bool {
-	appOrSP := a.AppServerOrSP
+	appOrSP := a.Resource
 	_, ok := appOrSP.(*AppServerOrSAMLIdPServiceProviderV1_AppServer)
 	return ok
 }
 
-// AppServersOrSAMLIdPServiceProviders is a list of AppServers or SAMLIdPServiceProviders.
+// AppServersOrSAMLIdPServiceProviders is a list of AppServers and SAMLIdPServiceProviders.
 type AppServersOrSAMLIdPServiceProviders []AppServerOrSAMLIdPServiceProvider
 
 func (s AppServersOrSAMLIdPServiceProviders) AsResources() []ResourceWithLabels {
@@ -312,8 +307,7 @@ func (a *AppServerOrSAMLIdPServiceProviderV1) GetMetadata() Metadata {
 	}
 }
 
-// GetName returns the name of either the App or the SAMLIdPServiceProvider, depending on which one
-// the AppServerOrSAMLIdPServiceProvider holds.
+// GetDescription returns the name of either the App or the SAMLIdPServiceProvider.
 func (a *AppServerOrSAMLIdPServiceProviderV1) GetName() string {
 	if a.IsAppServer() {
 		return a.GetAppServer().GetApp().GetName()

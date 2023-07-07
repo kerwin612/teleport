@@ -144,9 +144,8 @@ const (
 	// KindApp is a web app resource.
 	KindApp = "app"
 
-	// KindAppAndIdPServiceProvider is any app that can be displayed in the WebUI.
-	// This includes regular apps as well as SAML IdP Service Providers (SAML Applications).
-	KindAppAndIdPServiceProvider = "app_server_saml_idp_sp"
+	// KindAppAndIdPServiceProvider represent an App Servers as well as a SAML IdP Service Provider (SAML Application).
+	KindAppAndIdPServiceProvider = "app_server_and_saml_idp_sp"
 
 	// KindDatabaseServer is a database proxy server resource.
 	KindDatabaseServer = "db_server"

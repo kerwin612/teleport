@@ -71,7 +71,7 @@ type MakeAppsConfig struct {
 	AppClusterName string
 	// AppsToUserGroups is a mapping of application names to user groups.
 	AppsToUserGroups map[string]types.UserGroups
-	// AppServersAndSAMLIdPServiceProviders is a list of AppServers or SAMLIdPServiceProviders.
+	// AppServersAndSAMLIdPServiceProviders is a list of AppServers and SAMLIdPServiceProviders.
 	AppServersAndSAMLIdPServiceProviders types.AppServersOrSAMLIdPServiceProviders
 	// Identity is identity of the logged in user.
 	Identity *tlsca.Identity

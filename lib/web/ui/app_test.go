@@ -86,8 +86,12 @@ func TestMakeApps(t *testing.T) {
 			expected: []App{},
 		},
 		{
-			name:      "app without user groups",
-			appsOrSPs: types.AppServersOrSAMLIdPServiceProviders{createAppServerOrSPFromApp(newApp(t, "1", "1.com", "", map[string]string{"label1": "value1"})), createAppServerOrSPFromApp(newApp(t, "2", "2.com", "group 2 friendly name", map[string]string{"label2": "value2", types.OriginLabel: types.OriginOkta}))},
+			name: "app without user groups",
+			appsOrSPs: types.AppServersOrSAMLIdPServiceProviders{
+				createAppServerOrSPFromApp(newApp(t, "1", "1.com", "", map[string]string{"label1": "value1"})),
+				createAppServerOrSPFromApp(newApp(t, "2", "2.com", "group 2 friendly name", map[string]string{
+					"label2": "value2", types.OriginLabel: types.OriginOkta,
+				}))},
 			expected: []App{
 				{
 					Name:       "1",
@@ -113,8 +117,12 @@ func TestMakeApps(t *testing.T) {
 			},
 		},
 		{
-			name:      "app with user groups",
-			appsOrSPs: types.AppServersOrSAMLIdPServiceProviders{createAppServerOrSPFromApp(newApp(t, "1", "1.com", "", map[string]string{"label1": "value1"})), createAppServerOrSPFromApp(newApp(t, "2", "2.com", "group 2 friendly name", map[string]string{"label2": "value2", types.OriginLabel: types.OriginOkta}))},
+			name: "app with user groups",
+			appsOrSPs: types.AppServersOrSAMLIdPServiceProviders{
+				createAppServerOrSPFromApp(newApp(t, "1", "1.com", "", map[string]string{"label1": "value1"})),
+				createAppServerOrSPFromApp(newApp(t, "2", "2.com", "group 2 friendly name", map[string]string{
+					"label2": "value2", types.OriginLabel: types.OriginOkta,
+				}))},
 			appsToUserGroups: map[string]types.UserGroups{
 				"1": {
 					newGroup(t, "group1", "group1 desc", nil),
@@ -211,7 +219,7 @@ func newApp(t *testing.T, name, publicAddr, description string, labels map[strin
 // createAppServerOrSPFromApp returns a AppServerOrSAMLIdPServiceProvider given an App.
 func createAppServerOrSPFromApp(app types.Application) types.AppServerOrSAMLIdPServiceProvider {
 	appServerOrSP := &types.AppServerOrSAMLIdPServiceProviderV1{
-		AppServerOrSP: &types.AppServerOrSAMLIdPServiceProviderV1_AppServer{
+		Resource: &types.AppServerOrSAMLIdPServiceProviderV1_AppServer{
 			AppServer: &types.AppServerV3{
 				Spec: types.AppServerSpecV3{
 					App: app.(*types.AppV3),
@@ -226,7 +234,7 @@ func createAppServerOrSPFromApp(app types.Application) types.AppServerOrSAMLIdPS
 // createAppServerOrSPFromApp returns a AppServerOrSAMLIdPServiceProvider given a SAMLIdPServiceProvider.
 func createAppServerOrSPFromSAMLIdPServiceProvider(sp types.SAMLIdPServiceProvider) types.AppServerOrSAMLIdPServiceProvider {
 	appServerOrSP := &types.AppServerOrSAMLIdPServiceProviderV1{
-		AppServerOrSP: &types.AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider{
+		Resource: &types.AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider{
 			SAMLIdPServiceProvider: sp.(*types.SAMLIdPServiceProviderV1),
 		},
 	}

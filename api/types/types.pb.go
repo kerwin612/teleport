@@ -2814,20 +2814,19 @@ func (m *AppSpecV3) XXX_DiscardUnknown() {
 var xxx_messageInfo_AppSpecV3 proto.InternalMessageInfo
 
 // AppServerOrSAMLIdPServiceProviderV1 holds either an AppServerV3 or a SAMLIdPServiceProviderV1 resource (never both).
-// This is the resource used for WebUI requests to list Applications since we want to list both AppServers and
-// SAMLIdPServiceProviders in the UI.
+// Used in application listings that request both app servers and saml apps.
 type AppServerOrSAMLIdPServiceProviderV1 struct {
 	// Kind is the resource kind. Always "app_server_saml_idp_sp".
 	Kind string `protobuf:"bytes,1,opt,name=Kind,proto3" json:"kind"`
 	// The AppServer or SAMLIdPServiceProvider resource.
 	//
-	// Types that are valid to be assigned to AppServerOrSP:
+	// Types that are valid to be assigned to Resource:
 	//	*AppServerOrSAMLIdPServiceProviderV1_AppServer
 	//	*AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider
-	AppServerOrSP        isAppServerOrSAMLIdPServiceProviderV1_AppServerOrSP `protobuf_oneof:"AppServerOrSP"`
-	XXX_NoUnkeyedLiteral struct{}                                            `json:"-"`
-	XXX_unrecognized     []byte                                              `json:"-"`
-	XXX_sizecache        int32                                               `json:"-"`
+	Resource             isAppServerOrSAMLIdPServiceProviderV1_Resource `protobuf_oneof:"Resource"`
+	XXX_NoUnkeyedLiteral struct{}                                       `json:"-"`
+	XXX_unrecognized     []byte                                         `json:"-"`
+	XXX_sizecache        int32                                          `json:"-"`
 }
 
 func (m *AppServerOrSAMLIdPServiceProviderV1) Reset()      { *m = AppServerOrSAMLIdPServiceProviderV1{} }
@@ -2862,8 +2861,8 @@ func (m *AppServerOrSAMLIdPServiceProviderV1) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_AppServerOrSAMLIdPServiceProviderV1 proto.InternalMessageInfo
 
-type isAppServerOrSAMLIdPServiceProviderV1_AppServerOrSP interface {
-	isAppServerOrSAMLIdPServiceProviderV1_AppServerOrSP()
+type isAppServerOrSAMLIdPServiceProviderV1_Resource interface {
+	isAppServerOrSAMLIdPServiceProviderV1_Resource()
 	MarshalTo([]byte) (int, error)
 	Size() int
 }
@@ -2875,27 +2874,27 @@ type AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider struct {
 	SAMLIdPServiceProvider *SAMLIdPServiceProviderV1 `protobuf:"bytes,3,opt,name=SAMLIdPServiceProvider,proto3,oneof" json:"saml_idp_service_provider,omitempty"`
 }
 
-func (*AppServerOrSAMLIdPServiceProviderV1_AppServer) isAppServerOrSAMLIdPServiceProviderV1_AppServerOrSP() {
+func (*AppServerOrSAMLIdPServiceProviderV1_AppServer) isAppServerOrSAMLIdPServiceProviderV1_Resource() {
 }
-func (*AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider) isAppServerOrSAMLIdPServiceProviderV1_AppServerOrSP() {
+func (*AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider) isAppServerOrSAMLIdPServiceProviderV1_Resource() {
 }
 
-func (m *AppServerOrSAMLIdPServiceProviderV1) GetAppServerOrSP() isAppServerOrSAMLIdPServiceProviderV1_AppServerOrSP {
+func (m *AppServerOrSAMLIdPServiceProviderV1) GetResource() isAppServerOrSAMLIdPServiceProviderV1_Resource {
 	if m != nil {
-		return m.AppServerOrSP
+		return m.Resource
 	}
 	return nil
 }
 
 func (m *AppServerOrSAMLIdPServiceProviderV1) GetAppServer() *AppServerV3 {
-	if x, ok := m.GetAppServerOrSP().(*AppServerOrSAMLIdPServiceProviderV1_AppServer); ok {
+	if x, ok := m.GetResource().(*AppServerOrSAMLIdPServiceProviderV1_AppServer); ok {
 		return x.AppServer
 	}
 	return nil
 }
 
 func (m *AppServerOrSAMLIdPServiceProviderV1) GetSAMLIdPServiceProvider() *SAMLIdPServiceProviderV1 {
-	if x, ok := m.GetAppServerOrSP().(*AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider); ok {
+	if x, ok := m.GetResource().(*AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider); ok {
 		return x.SAMLIdPServiceProvider
 	}
 	return nil
@@ -21246,11 +21245,11 @@ func (m *AppServerOrSAMLIdPServiceProviderV1) MarshalToSizedBuffer(dAtA []byte) 
 		i -= len(m.XXX_unrecognized)
 		copy(dAtA[i:], m.XXX_unrecognized)
 	}
-	if m.AppServerOrSP != nil {
+	if m.Resource != nil {
 		{
-			size := m.AppServerOrSP.Size()
+			size := m.Resource.Size()
 			i -= size
-			if _, err := m.AppServerOrSP.MarshalTo(dAtA[i:]); err != nil {
+			if _, err := m.Resource.MarshalTo(dAtA[i:]); err != nil {
 				return 0, err
 			}
 		}
@@ -39245,8 +39244,8 @@ func (m *AppServerOrSAMLIdPServiceProviderV1) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovTypes(uint64(l))
 	}
-	if m.AppServerOrSP != nil {
-		n += m.AppServerOrSP.Size()
+	if m.Resource != nil {
+		n += m.Resource.Size()
 	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
@@ -55482,7 +55481,7 @@ func (m *AppServerOrSAMLIdPServiceProviderV1) Unmarshal(dAtA []byte) error {
 			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
-			m.AppServerOrSP = &AppServerOrSAMLIdPServiceProviderV1_AppServer{v}
+			m.Resource = &AppServerOrSAMLIdPServiceProviderV1_AppServer{v}
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
@@ -55517,7 +55516,7 @@ func (m *AppServerOrSAMLIdPServiceProviderV1) Unmarshal(dAtA []byte) error {
 			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
-			m.AppServerOrSP = &AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider{v}
+			m.Resource = &AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider{v}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

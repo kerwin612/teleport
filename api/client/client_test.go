@@ -359,7 +359,7 @@ func testResources[T types.ResourceWithLabels](resourceType, namespace string) (
 				}
 
 				resource := &types.AppServerOrSAMLIdPServiceProviderV1{
-					AppServerOrSP: &types.AppServerOrSAMLIdPServiceProviderV1_AppServer{
+					Resource: &types.AppServerOrSAMLIdPServiceProviderV1_AppServer{
 						AppServer: appServer,
 					},
 				}
@@ -371,7 +371,7 @@ func testResources[T types.ResourceWithLabels](resourceType, namespace string) (
 				}}}}
 
 				resource := &types.AppServerOrSAMLIdPServiceProviderV1{
-					AppServerOrSP: &types.AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider{
+					Resource: &types.AppServerOrSAMLIdPServiceProviderV1_SAMLIdPServiceProvider{
 						SAMLIdPServiceProvider: sp,
 					},
 				}

@@ -890,15 +890,14 @@ message AppSpecV3 {
 }
 
 // AppServerOrSAMLIdPServiceProviderV1 holds either an AppServerV3 or a SAMLIdPServiceProviderV1 resource (never both).
-// This is the resource used for WebUI requests to list Applications since we want to list both AppServers and
-// SAMLIdPServiceProviders in the UI.
+// Used in application listings that request both app servers and saml apps.
 message AppServerOrSAMLIdPServiceProviderV1 {
   option (gogoproto.goproto_stringer) = false;
   option (gogoproto.stringer) = false;
   // Kind is the resource kind. Always "app_server_saml_idp_sp".
   string Kind = 1 [(gogoproto.jsontag) = "kind"];
   // The AppServer or SAMLIdPServiceProvider resource.
-  oneof AppServerOrSP {
+  oneof Resource {
     // AppServer is the AppServer resource.
     AppServerV3 AppServer = 2 [(gogoproto.jsontag) = "app_server,omitempty"];
     // SAMLIdPServiceProvider is the SAMLIdPServiceProvider resource.
