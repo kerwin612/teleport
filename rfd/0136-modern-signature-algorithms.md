@@ -24,9 +24,9 @@ Authorities and all user and host keys.
 
 More modern algorithms based on Elliptic Curve Cryptography offer better
 security properties with smaller keys that offer better performance for keypair
-generation, signing operations, and signature verification.  Some of the more
-restrictive security policies are starting to reject RSA2048 (e.g.
-[RHEL 8's FUTURE policy](https://access.redhat.com/articles/3642912)).
+generation and signing operations, with comparable performance for signature
+verification.  Some of the more restrictive security policies are starting to
+reject RSA2048 (e.g.  [RHEL 8's FUTURE policy](https://access.redhat.com/articles/3642912)).
 
 ## Details
 
@@ -48,9 +48,6 @@ The initial set of suites we will introduce is:
 
 The `legacy` suite exists for compatibility and it will use the exact same
 key types and algorithms Teleport uses today (2048-bit RSA everywhere).
-This will be the initial default, changing the default to `balanced-v1` will
-be a breaking change that will be made in either a major version release of
-Teleport, or with a version bump to the `teleport.yaml` config.
 
 The `balanced-v1` suite will use a modern set of algorithms selected to
 balance security, compatibility, and performance.
@@ -81,10 +78,22 @@ support and test for (YubiHSM2, AWS CloudHSM, and GCP KMS).
 This is very similar to the `fips-v1` suite, but "subjects" (users, hosts, etc)
 will still be allowed to use Ed25519 keys, it is only the CAs that are limited
 to the algorithms supported by the HSM.
-Whenever the default suite is updated from "legacy" to "balanced-v1", it will be
-overridden by `fips-v1` if and HSM or KMS is configured.
-Clusters with HSMs that must use FIPS algorithms should used the `fips-v1`
-suite.
+
+### Default suite
+
+For all Teleport clusters where the Auth server's teleport.yaml config file has
+`version: v3` (the current latest version), the default suite will be `legacy`.
+Changing the default will be a breaking change, so we will introduce a config v4
+to change the default.
+
+In config v4 the default suite will be:
+
+* `fips-v1` if the Auth server was started in FIPS mode
+* `hsm-v1` if the Auth server has any HSM or KMS configured (and is not in FIPS mode)
+* `balanced-v1` otherwise
+
+If the suite is explicitly set in the teleport.yaml or
+`cluster_auth_preference`, it will be honoured and no default will be necessary.
 
 ### Configuration
 
@@ -109,7 +118,7 @@ teleport:
   auth_service:
     enabled: true
 
-    # supported values are balanced-v1, fips-v1, and legacy
+    # supported values are balanced-v1, fips-v1, hsm-v1, and legacy
     signature_algorithm_suite: balanced-v1
 ```
 
@@ -118,7 +127,7 @@ kind: cluster_auth_preference
 metadata:
   name: cluster-auth-preference
 spec:
-  # supported values are balanced-v1, fips-v1, and legacy
+  # supported values are balanced-v1, fips-v1, hsm-v1, and legacy
   signature_algorithm_suite: balanced-v1
 ```
 
@@ -136,7 +145,7 @@ The following key types will be used when the configured algorithm suite is
     * TLS: ECDSA with NIST P-256
   * database CA
     * TLS: 2048-bit RSA
-      * necessary to use RSA for our Snowflake integration
+      * it's necessary to use RSA for our Snowflake integration, maybe others
   * OpenSSH CA
     * SSH: Ed25519
   * JWT CA
@@ -148,6 +157,7 @@ The following key types will be used when the configured algorithm suite is
 * Subject key types
   * users via `tsh login`
     * SSH: Ed25519 (SSH cert signed by user CA)
+      * a different algorithm may be used by a hardware key (currently ECDSA with NIST P-256)
     * TLS: ECDSA with NIST P-256 (X.509 cert signed by user CA)
   * user web sessions
     * SSH: Ed25519 (SSH cert signed by user CA)
@@ -169,11 +179,23 @@ The following key types will be used when the configured algorithm suite is
       change this with some effort, and I don't think it would be a breaking
       change (we could do it within `balanced-v1`).
 
+This suite will *not* be compatible with clusters running in FIPS mode and/or
+configured to use an HSM or KMS for CAs.
+
 ### `fips-v1` suite
 
 Identical to `balanced-v1` suite except:
 
 * all instances of Ed25519 are replaced with ECDSA with NIST P-256
+
+FIPS 186-5 only added approval for Ed25519 relatively recently (February 2023)
+and there is some nuance to how the algorithm can be used.
+An even more relevant reason for us to avoid it is that our FIPS builds are
+compiled with `GOEXPERIMENT=boringcrypto`, which has no support for Ed25519
+(yet, at least).
+
+This suite will be compatible with clusters running in FIPS mode and/or
+configured to use an HSM or KMS for CAs.
 
 ### `hsm-v1` suite
 
@@ -181,11 +203,24 @@ Identical to `balanced-v1` suite except:
 
 * instances of Ed25519 *for CA key types only* are replaced with ECDSA with NIST P-256
 
+Subjects may still use Ed25519 keys, the HSM is only used for CA keys so the
+algorithms are limited to what the HSM can support.
+
+We claim to support and test with YubiHSM2, AWS CloudHSM, and GCP KMS.
+All of these support ECDSA with NIST P-256, none support Ed25519.
+
+This suite will *not* be compatible with clusters running in FIPS mode, because
+subjects may use Ed25519.
+In case both FIPS mode and an HSM or KMS are desired, the `fips-v1` suite should
+be used instead, it is also compatible with all HSMs and KMS we support.
+
 ### `legacy` suite
 
 2048-bit RSA keys are used by all existing CAs and subjects.
+
 If new CAs or subjects are added, they should use the same choice as
-`balanced-v1` where possible.
+`fips-v1` where possible, because the `legacy` suite may be used in clusters
+running in FIPS mode or with an HSM.
 
 ### CA details
 
@@ -357,36 +392,43 @@ This will change the disk layout of the ~/.tsh directory:
 +    │   ├── foo.pub                  --> SSH Public Key
      │   ├── foo.ppk                  --> PuTTY PPK-formatted keypair for user "foo"
      │   ├── kube_credentials.lock    --> Kube credential lockfile, used to prevent excessive relogin attempts
-+    │   ├── foo-x509-privkey.pem     --> TLS client private key
-     │   ├── foo-x509.pem             --> TLS client certificate for Auth Server
+-    │   ├── foo-x509.pem             --> TLS client certificate for Auth Server
++    │   ├── foo-tls-privkey.pem      --> TLS client private key
++    │   ├── foo-x509-cert.pem        --> TLS client certificate for Auth Server
      │   ├── foo-ssh                  --> SSH certs for user "foo"
      │   │   ├── root-cert.pub        --> SSH cert for Teleport cluster "root"
      │   │   └── leaf-cert.pub        --> SSH cert for Teleport cluster "leaf"
      │   ├── foo-app                  --> App access certs for user "foo"
      │   │   ├── root                 --> App access certs for cluster "root"
-     │   │   │   ├── appA-x509.pem    --> TLS cert for app service "appA"
-     │   │   │   └── appB-x509.pem    --> TLS cert for app service "appB"
+-    │   │   │   ├── appA-x509.pem    --> TLS cert for app service "appA"
+-    │   │   │   └── appB-x509.pem    --> TLS cert for app service "appB"
++    │   │   │   ├── appA-x509-cert.pem --> TLS cert for app service "appA"
++    │   │   │   └── appB-x509-cert.pem --> TLS cert for app service "appB"
      │   │   │   └── appB-localca.pem --> Self-signed localhost CA cert for app service "appB"
      │   │   └── leaf                 --> App access certs for cluster "leaf"
-     │   │       └── appC-x509.pem    --> TLS cert for app service "appC"
+-    │   │       └── appC-x509.pem    --> TLS cert for app service "appC"
++    │   │       └── appC-x509-cert.pem --> TLS cert for app service "appC"
      │   ├── foo-db                   --> Database access certs for user "foo"
      │   │   ├── root                 --> Database access certs for cluster "root"
-     │   │   │   ├── dbA-x509.pem     --> TLS cert for database service "dbA"
-     │   │   │   ├── dbB-x509.pem     --> TLS cert for database service "dbB"
+-    │   │   │   ├── dbA-x509.pem     --> TLS cert for database service "dbA"
+-    │   │   │   ├── dbB-x509.pem     --> TLS cert for database service "dbB"
++    │   │   │   ├── dbA-x509-cert.pem --> TLS cert for database service "dbA"
++    │   │   │   ├── dbB-x509-cert.pem --> TLS cert for database service "dbB"
      │   │   │   └── dbC-wallet       --> Oracle Client wallet Configuration directory.
      │   │   ├── leaf                 --> Database access certs for cluster "leaf"
-     │   │   │   └── dbC-x509.pem     --> TLS cert for database service "dbC"
+-    │   │   │   └── dbC-x509.pem     --> TLS cert for database service "dbC"
++    │   │   │   └── dbC-x509-cert.pem --> TLS cert for database service "dbC"
      │   │   └── proxy-localca.pem    --> Self-signed TLS Routing local proxy CA
      │   ├── foo-kube                 --> Kubernetes certs for user "foo"
      │   |    ├── root                 --> Kubernetes certs for Teleport cluster "root"
      │   |    │   ├── kubeA-kubeconfig --> standalone kubeconfig for Kubernetes cluster "kubeA"
-     │   |    │   ├── kubeA-x509.pem   --> TLS cert for Kubernetes cluster "kubeA"
-     │   |    │   ├── kubeB-kubeconfig --> standalone kubeconfig for Kubernetes cluster "kubeB"
-     │   |    │   ├── kubeB-x509.pem   --> TLS cert for Kubernetes cluster "kubeB"
+-    │   |    │   ├── kubeA-x509.pem   --> TLS cert for Kubernetes cluster "kubeA"
++    │   |    │   ├── kubeA-x509-cert.pem   --> TLS cert for Kubernetes cluster "kubeA"
      │   |    │   └── localca.pem      --> Self-signed localhost CA cert for Teleport cluster "root"
      │   |    └── leaf                 --> Kubernetes certs for Teleport cluster "leaf"
      │   |        ├── kubeC-kubeconfig --> standalone kubeconfig for Kubernetes cluster "kubeC"
-     │   |        └── kubeC-x509.pem   --> TLS cert for Kubernetes cluster "kubeC"
+-    │   |        └── kubeC-x509.pem   --> TLS cert for Kubernetes cluster "kubeC"
++    │   |        └── kubeC-x509-cert.pem --> TLS cert for Kubernetes cluster "kubeC"
      |   └── cas                       --> Trusted clusters certificates
      |        ├── root.pem             --> TLS CA for teleport cluster "root"
      |        ├── leaf1.pem            --> TLS CA for teleport cluster "leaf1"
@@ -394,6 +436,29 @@ This will change the disk layout of the ~/.tsh directory:
      └── two.example.com               --> Additional proxy host entries follow the same format
                 ...
 ```
+
+`foo` above is a stand-in for the username of the logged-in user.
+
+Currently the user's private key for both SSH and TLS is held in
+`~/.tsh/keys/one.exmample.com/foo`, with the SSH pubkey held in `foo.pub` and
+the TLS cert held in `foo-x509.pem`.
+App, Database, and K8s certs use the same private key and are held under the
+`foo-app`, `foo-db`, and `foo-kube` directories.
+
+To avoid breaking user OpenSSH config files that rely on the location of the ssh
+keys, they will not be moved.
+The TLS keys and certs are often used automatically by `tsh` e.g. in `tsh proxy
+app`, `tsh db connect`, `tsh kube login`, so it is less likely for users to have
+to make a manual fix if we move the TLS files.
+
+The TLS private key will now be held in
+`~/.tsh/keys/one.exmample.com/foo-tls-privkey.pem`
+
+All TLS x509 cert files will be renamed from `<name>-x509.pem` to
+`<name>-x509-cert.pem` so that any software trying to use `<name>-x509.pem`
+along with the outdated private key location will fail to load both files,
+instead of succesfully opening the files but failing with some confusing error
+when the private key does not match the certificate.
 
 RPCs such as `GenerateUserCerts` will also need to change to support passing
 both of the public keys along.
@@ -403,18 +468,24 @@ for both protocols if both are not passed.
 ### HSMs and KMS
 
 Admins should configure the `hsm-v1` suite when using any HSM or KMS.
-If ever we change the default algorithm suite away from `legacy`, it should
-default to `hsm-v1` if any HSM or KMS is configured.
+
+When the default suite is changed in config v4, it will default to `hsm-v1` if
+any HSM or KMS is configured.
 If a specific PKCS#11 HSM does not support one of the algorithms, we will do our
 best to return an informative error message to the user and block the CA
 rotation before the misconfigured algorithm could take effect.
+
+If a cluster has an HSM and an admin explicitly configures the `balanced-v1`
+suite, we can warn but try to support it in case their PKCS#11 HSM supports
+Ed25519, and fail early with explicit logs if there's an error.
 
 #### Cloud
 
 Cloud will be able to select their preferred default suite by configuring it in
 the `teleport.yaml`.
 Cloud users will be able to change the CA algorithms by modifying the
-`cluster_auth_preference` and performing a CA rotation.
+`cluster_auth_preference` and performing the necessary CA rotations.
+We should update the default to `balanced-v1` when config v4 is released.
 
 ### Backward Compatibility
 
@@ -576,8 +647,8 @@ User CA
 expires:         Jun 21 2033 00:03:19 UTC
 last rotated:    never
 rotation state:  standby
-SSH algorithm:   RSA2048_PKCS1_SHA512 (recommended-v1 algorithm Ed25519 will take effect during next manual CA rotation)
-TLS algorithm:   RSA2048_PKCS1_SHA256 (recommended-v1 algorithm ECDSA_P256_SHA256 will take effect during next manual CA rotation)
+SSH algorithm:   RSA2048_PKCS1_SHA512 (balanced-v1 algorithm Ed25519 will take effect during next manual CA rotation)
+TLS algorithm:   RSA2048_PKCS1_SHA256 (balanced-v1 algorithm ECDSA_P256_SHA256 will take effect during next manual CA rotation)
 
 Database CA
 expires:         Jun 21 2033 00:03:19 UTC
@@ -593,7 +664,7 @@ algorithm change.
 
 ```
 $ tctl auth rotate --manual --type user --phase init
-INFO: Rotation will update the key types for this CA to match the recommended-v1 suite:
+INFO: Rotation will update the key types for this CA to match the balanced-v1 suite:
 Protocol  Before                After
 SSH       RSA2048_PKCS1_SHA512  Ed25519
 TLS       RSA2048_PKCS1_SHA256  ECDSA_P256_SHA256
@@ -618,6 +689,15 @@ Log messages will be emitted whenever CA keys/certs are generated or rotated,
 including the algorithms used for all new keys.
 
 Audit events will also include the algorithms used.
+
+When the configuration has been updated but the certs have not been rotated yet,
+this will be logged on Auth startup and visible in the output of `tctl status`
+(see UX section).
+
+When the `legacy` suite is used by default and hasn't been explicitly
+configured, we will log during Auth server startup and display in the output of
+`tctl status` a hint that the newer suites are available and suggest upgrading
+with a link to the docs.
 
 ### Product Usage
 
