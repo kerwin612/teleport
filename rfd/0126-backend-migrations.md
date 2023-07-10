@@ -91,16 +91,22 @@ It's quite common to add a new field to an existing resource in order to support
 be optional - adding a field which has a required and meaningful default value causes more issues than just lossy reads
 and writes. Since the versions of instances in the cluster may lag behind Auth considerably, any new fields which need
 an explicit default value to operate will cause problems for older agents which will not know about the value; this is
-particularly true for Roles when adding a new field which determines access to a resource. Any new fields should not be
-automatically populated by Teleport and instead should require explicit user input to be populated. Meaning, when a new
-field is added to an existing resource its `CheckAndSetDefaults` or an equivalent method must not be updated to detect
-if the field is empty and provide a default value. Instead, that new field should stay empty until a user explicitly
-sets it via `tctl edit` or some other equivalent means.
+particularly true for Roles when adding a new field which determines access to a resource.
 
-If a client attempts to update a resource with the new field during a rolling deploy when both the old and new versions
-of Auth are running simultaneously there is a 50/50 chance that writes and reads which contain the new field will be
-lossy since the old instance doesn't know about the new field. There are a few ways we can proceed depending on the
-desired outcome.
+If a client attempts to update a resource with the new field during a rolling deployment when both the old and new
+versions of Auth are running simultaneously there is a 50/50 chance that writes and reads which contain the new field
+will be lossy since the old instance doesn't know about the new field. However, data loss is a problem outside of
+rolling Auth updates. Reads are going to be lossy unless the client version is at the same version or newer than Auth
+because they won't know about new optional fields. Writes are going to be lossy unless Auth is at the same or newer
+version than clients because it won't know that there are additional fields to persist. Until there is a solution for
+data loss under normal operation of a cluster we should accept the possible data loss during the very small time frame
+which a rolling deployment occurs.
+
+The risks of data loss from new fields may be mitigated in the future by the Cloud First Deployment strategy defined in
+RFD 134 and automatic client updates. If Cloud is running off of master the probability of a client attempting to
+read/write a field that Auth doesn't know about is less likely. Ensuring that clients are using the appropriate version
+for a cluster will prevent client drift that results in data loss. As long as the clients are not upgraded until after
+Auth then there is no opportunity for new fields to be accessed.
 
 ### Changing the meaning of a field
 
@@ -126,61 +132,6 @@ result of not knowing how to process the new Bar.
 
 This is also true for extending the supported predicate functions available for any existing field. Older Auth instances
 will be unable to parse the new expression.
-
-#### Permit the lossy behavior
-
-If Auth doesn't fully understand the new resource, then nothing else in the cluster will either, so even if the write
-succeeds the new resource will very likely not be understood by any agents in the cluster. A write which uses a new
-optional field before the release is fully rolled out to Cloud requires two things:
-
-1. A client consuming a version of `api` that contains the new field
-2. Knowledge that the new field exists
-
-If Cloud is deploying as described in `RFD 134: Cloud first deployments` then that would require a user to either build
-`tctl` off master or pull the newest Cloud version of `tctl` prior to Cloud rolling out that version. If we also assume
-that client automatic upgrades as mentioned in RFD 134 are in place the latter scenario becomes less likely.
-
-Most users will only discover the new field by consuming documentation or examples. To reduce the chance of discovering
-resource changes prior to being rolled out we could delay publishing any updated documentation for the changes until
-after Cloud has rolled out the release to the control plane.
-
-#### Reject any requests which have `baz` populated
-
-```go
-func (g *GRPCServer) UpsertFoo(ctx context.Context, f *Foo) (*emptypb.Empty, error) {
-	if f.baz != "" && !fooBazFieldEnabled {
-		return &emptypb.Empty{}, trace.BadParameter("baz cannot be safely stored")
-	}
-	...
-	return &emptypb.Empty{}, nil
-}
-```
-
-The downside to this approach is that only new versions of Auth know to reject the request, any older versions will
-process the request while silently dropping the unknown field. This could lead to confusion when half the requests are
-rejected and half of the requests don't end up storing the expected value.
-
-#### Always store the default value when `baz` is populated
-
-```go
-func (g *GRPCServer) UpsertFoo(ctx context.Context, f *Foo) (*emptypb.Empty, error) {
-	if !fooBazFieldEnabled {
-		f.baz = ""
-	}
-	...
-	return &emptypb.Empty{}, nil
-}
-```
-
-This scenario unifies the behavior of new and old versions of Auth but may still cause confusion.
-
-#### Separate API and storage objects
-
-By storing the API object directly in the backend it's not possible to make a change to the storage resource without it
-immediately being available to consumers of the `api` module. Which means as soon as the resource change lands in a
-release that tctl and tsh will have the ability to try to use it. If the representation of the resource stored in the
-backend was a completely separate object from the API object the backend storage changes could be made first and the API
-representation of the resource could only be changed once it was safe for clients to do so.
 
 ### Alternate Options Considered
 
