@@ -4105,6 +4105,7 @@ func (a *Server) CreateAccessRequest(ctx context.Context, req types.AccessReques
 		RequestID:            req.GetName(),
 		RequestState:         req.GetState().String(),
 		Reason:               req.GetRequestReason(),
+		Persist:              req.GetPersist(),
 	})
 	if err != nil {
 		log.WithError(err).Warn("Failed to emit access request create event.")
@@ -4147,6 +4148,7 @@ func (a *Server) SetAccessRequestState(ctx context.Context, params types.AccessR
 		RequestState: params.State.String(),
 		Reason:       params.Reason,
 		Roles:        params.Roles,
+		Persist:      params.Persist,
 	}
 
 	if delegator := apiutils.GetDelegator(ctx); delegator != "" {
@@ -4206,6 +4208,7 @@ func (a *Server) SubmitAccessReview(ctx context.Context, params types.AccessRevi
 		ProposedState: params.Review.ProposedState.String(),
 		Reason:        params.Review.Reason,
 		Reviewer:      params.Review.Author,
+		Persist:       time.Now().Add(24 * time.Hour), //TODO(jakule): fix
 	}
 
 	if len(params.Review.Annotations) > 0 {
