@@ -4649,7 +4649,7 @@ func (a *ServerWithRoles) GetApplicationServers(ctx context.Context, namespace s
 
 // GetAppServersAndSAMLIdPServiceProviders returns a list containing all registered AppServers and SAMLIdPServiceProviders.
 func (a *ServerWithRoles) GetAppServersAndSAMLIdPServiceProviders(ctx context.Context, namespace string) ([]types.AppServerOrSAMLIdPServiceProvider, error) {
-	appservers, err := a.authServer.GetApplicationServers(ctx, namespace)
+	appservers, err := a.GetApplicationServers(ctx, namespace)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
