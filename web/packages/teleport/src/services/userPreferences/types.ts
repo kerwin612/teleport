@@ -34,7 +34,6 @@ export interface UserPreferences {
   onboard: OnboardUserPreferences;
 }
 
-export type UserPreferencesSubset = Subset<UserPreferences>;
 export type GetUserPreferencesResponse = UserPreferences;
 
 export function deprecatedThemeToThemePreference(
