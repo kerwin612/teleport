@@ -56,7 +56,7 @@ func (h *Handler) clusterAppsGet(w http.ResponseWriter, r *http.Request, p httpr
 		return nil, trace.Wrap(err)
 	}
 
-	req, err := convertListResourcesRequest(r, types.KindAppAndIdPServiceProvider)
+	req, err := convertListResourcesRequest(r, types.KindAppOrSAMLIdPServiceProvider)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}

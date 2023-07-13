@@ -35,16 +35,15 @@ type AppServerOrSAMLIdPServiceProvider interface {
 	IsAppServer() bool
 }
 
-const (
-	// SAMLIdPServiceProviderDescription is a static description for SAMLIdpServiceProvider resources since the resource itself does not supply its own description.
-	SAMLIdPServiceProviderDescription = "SAML Application"
-)
+// staticSAMLIdPServiceProviderDescription is a static description for SAMLIdpServiceProvider resources since the resource itself does not supply its own description.
+const staticSAMLIdPServiceProviderDescription = "SAML Application"
 
+// GetKind returns the kind that this AppServerOrSAMLIdPServiceProvider object represents, either KindAppServer or KindSAMLIdPServiceProvider.
 func (a *AppServerOrSAMLIdPServiceProviderV1) GetKind() string {
 	if a.IsAppServer() {
-		return KindSAMLIdPServiceProvider
+		return KindAppServer
 	}
-	return KindAppServer
+	return KindSAMLIdPServiceProvider
 }
 
 // GetDescription returns the description of either the App or the SAMLIdPServiceProvider.
@@ -52,7 +51,7 @@ func (a *AppServerOrSAMLIdPServiceProviderV1) GetDescription() string {
 	if a.IsAppServer() {
 		return a.GetAppServer().GetApp().GetDescription()
 	}
-	return SAMLIdPServiceProviderDescription
+	return staticSAMLIdPServiceProviderDescription
 }
 
 // GetDescription returns the public address of either the App or the SAMLIdPServiceProvider.
@@ -107,7 +106,7 @@ func (s AppServersOrSAMLIdPServiceProviders) SortByCustom(sortBy SortBy) error {
 			return stringCompare(s[i].GetPublicAddr(), s[j].GetPublicAddr(), isDesc)
 		})
 	default:
-		return trace.NotImplemented("sorting by field %q for resource %q is not supported", sortBy.Field, KindAppAndIdPServiceProvider)
+		return trace.NotImplemented("sorting by field %q for resource %q is not supported", sortBy.Field, KindAppOrSAMLIdPServiceProvider)
 	}
 
 	return nil

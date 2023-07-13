@@ -540,7 +540,7 @@ func TestMatchResourceByFilters(t *testing.T) {
 				return appServer
 			},
 			filters: MatchResourceFilter{
-				ResourceKind:        types.KindAppAndIdPServiceProvider,
+				ResourceKind:        types.KindAppOrSAMLIdPServiceProvider,
 				PredicateExpression: filterExpression,
 			},
 		},
@@ -552,7 +552,7 @@ func TestMatchResourceByFilters(t *testing.T) {
 				return appOrSP
 			},
 			filters: MatchResourceFilter{
-				ResourceKind:        types.KindAppAndIdPServiceProvider,
+				ResourceKind:        types.KindAppOrSAMLIdPServiceProvider,
 				PredicateExpression: filterExpression,
 			},
 		},

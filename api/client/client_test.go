@@ -180,7 +180,7 @@ func (m *mockServer) ListResources(ctx context.Context, req *proto.ListResources
 			}
 
 			protoResource = &proto.PaginatedResource{Resource: &proto.PaginatedResource_WindowsDesktop{WindowsDesktop: desktop}}
-		case types.KindAppAndIdPServiceProvider:
+		case types.KindAppOrSAMLIdPServiceProvider:
 			appServerOrSP, ok := resource.(*types.AppServerOrSAMLIdPServiceProviderV1)
 			if !ok {
 				return nil, trace.Errorf("AppServerOrSAMLIdPServiceProvider has invalid type %T", resource)
@@ -331,7 +331,7 @@ func testResources[T types.ResourceWithLabels](resourceType, namespace string) (
 
 			resources = append(resources, any(resource).(T))
 		}
-	case types.KindAppAndIdPServiceProvider:
+	case types.KindAppOrSAMLIdPServiceProvider:
 		for i := 0; i < size; i++ {
 			// Alternate between adding Apps and SAMLIdPServiceProviders. If `i` is even, add an app.
 			if i%2 == 0 {
@@ -697,7 +697,7 @@ func TestGetResources(t *testing.T) {
 
 	t.Run("AppServerAndSAMLIdPServiceProvider", func(t *testing.T) {
 		t.Parallel()
-		testGetResources[types.AppServerOrSAMLIdPServiceProvider](t, clt, types.KindAppAndIdPServiceProvider)
+		testGetResources[types.AppServerOrSAMLIdPServiceProvider](t, clt, types.KindAppOrSAMLIdPServiceProvider)
 	})
 }
 
@@ -729,7 +729,7 @@ func TestGetResourcesWithFilters(t *testing.T) {
 			resourceType: types.KindWindowsDesktop,
 		},
 		"AppAndIdPServiceProvider": {
-			resourceType: types.KindAppAndIdPServiceProvider,
+			resourceType: types.KindAppOrSAMLIdPServiceProvider,
 		},
 	}
 

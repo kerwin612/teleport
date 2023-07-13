@@ -4501,7 +4501,7 @@ func (g *GRPCServer) ListResources(ctx context.Context, req *proto.ListResources
 			}
 
 			protoResource = &proto.PaginatedResource{Resource: &proto.PaginatedResource_UserGroup{UserGroup: userGroup}}
-		case types.KindAppAndIdPServiceProvider:
+		case types.KindAppOrSAMLIdPServiceProvider:
 			switch appOrSP := resource.(type) {
 			case *types.AppServerV3:
 				protoResource = &proto.PaginatedResource{

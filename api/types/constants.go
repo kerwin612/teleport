@@ -144,8 +144,10 @@ const (
 	// KindApp is a web app resource.
 	KindApp = "app"
 
-	// KindAppAndIdPServiceProvider represent an App Servers as well as a SAML IdP Service Provider (SAML Application).
-	KindAppAndIdPServiceProvider = "app_server_and_saml_idp_sp"
+	// KindAppOrSAMLIdPServiceProvider represent an App Server resource or a SAML IdP Service Provider (SAML Application) resource.
+	// This is not a real resource stored in the backend, it is a pseudo resource used only to provide a common interface to
+	// the ListResources RPC in order to be able to list both AppServers and SAMLIdPServiceProviders in the same request.
+	KindAppOrSAMLIdPServiceProvider = "app_server_or_saml_idp_sp"
 
 	// KindDatabaseServer is a database proxy server resource.
 	KindDatabaseServer = "db_server"

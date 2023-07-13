@@ -1821,7 +1821,7 @@ func (a *ServerWithRoles) listResourcesWithSort(ctx context.Context, req proto.L
 		}
 		resources = servers.AsResources()
 
-	case types.KindAppAndIdPServiceProvider:
+	case types.KindAppOrSAMLIdPServiceProvider:
 		appsAndServiceProviders, err := a.GetAppServersAndSAMLIdPServiceProviders(ctx, req.Namespace)
 		if err != nil {
 			return nil, trace.Wrap(err)

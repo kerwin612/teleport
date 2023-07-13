@@ -2159,7 +2159,7 @@ func TestGetAndList_AppServersAndSAMLIdPServiceProviders(t *testing.T) {
 		Namespace: defaults.Namespace,
 		// Guarantee that the list will have all the app servers and IdP service providers.
 		Limit:        int32(numResources + 1),
-		ResourceType: types.KindAppAndIdPServiceProvider,
+		ResourceType: types.KindAppOrSAMLIdPServiceProvider,
 	}
 
 	// create user, role, and client
@@ -2199,7 +2199,7 @@ func TestGetAndList_AppServersAndSAMLIdPServiceProviders(t *testing.T) {
 	baseRequest := proto.ListResourcesRequest{
 		Namespace:    defaults.Namespace,
 		Limit:        int32(numResources + 1),
-		ResourceType: types.KindAppAndIdPServiceProvider,
+		ResourceType: types.KindAppOrSAMLIdPServiceProvider,
 	}
 
 	// list only application with label
