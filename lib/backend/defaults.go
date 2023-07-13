@@ -25,7 +25,7 @@ const (
 	// DefaultBacklogGracePeriod is the default amount of time
 	// that the circular buffer will tolerate an event backlog
 	// in one of its watchers.
-	DefaultBacklogGracePeriod = time.Second * 30
+	DefaultBacklogGracePeriod = time.Second * 59
 	// DefaultPollStreamPeriod is a default event poll stream period
 	DefaultPollStreamPeriod = time.Second
 	// DefaultEventsTTL is a default events TTL period
