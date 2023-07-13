@@ -22,6 +22,7 @@ import {
 import {
   ReloginRequest,
   SendNotificationRequest,
+  SendPendingHeadlessAuthenticationRequest,
 } from 'teleterm/services/tshdEvents';
 import { ClustersService } from 'teleterm/ui/services/clusters';
 import { ModalsService } from 'teleterm/ui/services/modals';
@@ -34,6 +35,7 @@ import { NotificationsService } from 'teleterm/ui/services/notifications';
 import { FileTransferService } from 'teleterm/ui/services/fileTransferClient';
 import { ReloginService } from 'teleterm/services/relogin';
 import { TshdNotificationsService } from 'teleterm/services/tshdNotifications';
+import { HeadlessAuthenticationService } from 'teleterm/services/headlessAuthn';
 import { UsageService } from 'teleterm/ui/services/usage';
 import { ResourcesService } from 'teleterm/ui/services/resources';
 import { ConnectMyComputerService } from 'teleterm/ui/services/connectMyComputer';
@@ -71,6 +73,7 @@ export default class AppContext implements IAppContext {
   subscribeToTshdEvent: SubscribeToTshdEvent;
   reloginService: ReloginService;
   tshdNotificationsService: TshdNotificationsService;
+  headlessAuthenticationService: HeadlessAuthenticationService;
   usageService: UsageService;
   configService: ConfigService;
   connectMyComputerService: ConnectMyComputerService;
@@ -136,6 +139,10 @@ export default class AppContext implements IAppContext {
     this.connectMyComputerService = new ConnectMyComputerService(
       this.mainProcessClient
     );
+    this.headlessAuthenticationService = new HeadlessAuthenticationService(
+      mainProcessClient,
+      this.modalsService
+    );
   }
 
   async init(): Promise<void> {
@@ -158,5 +165,14 @@ export default class AppContext implements IAppContext {
         request as SendNotificationRequest
       );
     });
+
+    this.subscribeToTshdEvent(
+      'sendPendingHeadlessAuthentication',
+      ({ request }) => {
+        this.headlessAuthenticationService.sendPendingHeadlessAuthentication(
+          request as SendPendingHeadlessAuthenticationRequest
+        );
+      }
+    );
   }
 }

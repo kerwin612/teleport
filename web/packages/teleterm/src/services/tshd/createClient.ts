@@ -30,7 +30,10 @@ import middleware, { withLogging } from './middleware';
 import * as types from './types';
 import createAbortController from './createAbortController';
 import { mapUsageEvent } from './mapUsageEvent';
-import { ReportUsageEventRequest } from './types';
+import {
+  ReportUsageEventRequest,
+  UpdateHeadlessAuthenticationStateParams,
+} from './types';
 
 export default function createClient(
   addr: string,
@@ -640,6 +643,24 @@ export default function createClient(
       const req = mapUsageEvent(event);
       return new Promise<void>((resolve, reject) => {
         tshd.reportUsageEvent(req, err => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      });
+    },
+
+    updateHeadlessAuthenticationState(
+      params: UpdateHeadlessAuthenticationStateParams
+    ) {
+      const req = new api.UpdateHeadlessAuthenticationStateRequest()
+        .setRootClusterUri(params.rootClusterURI)
+        .setHeadlessAuthenticationId(params.headlessAuthenticationID)
+        .setState(params.state);
+      return new Promise<void>((resolve, reject) => {
+        tshd.updateHeadlessAuthenticationState(req, err => {
           if (err) {
             reject(err);
           } else {

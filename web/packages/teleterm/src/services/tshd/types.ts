@@ -229,6 +229,9 @@ export type TshClient = {
     abortSignal?: TshAbortSignal
   ) => FileTransferListeners;
   reportUsageEvent: (event: ReportUsageEventRequest) => Promise<void>;
+  updateHeadlessAuthenticationState: (
+    params: UpdateHeadlessAuthenticationStateParams
+  ) => Promise<void>;
 };
 
 export type TshAbortController = {
@@ -318,3 +321,9 @@ export type Label = apiLabel.Label.AsObject;
 
 // Replaces object property with a new type
 type Modify<T, R> = Omit<T, keyof R> & R;
+
+export type UpdateHeadlessAuthenticationStateParams = {
+  rootClusterURI: uri.RootClusterUri;
+  headlessAuthenticationID: string;
+  state: apiService.HeadlessAuthenticationState;
+};
