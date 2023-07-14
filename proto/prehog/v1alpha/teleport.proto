@@ -48,12 +48,20 @@ message SSOCreateEvent {
   string connector_type = 1;
 }
 
+message DiscoveredDatabaseMetadata {
+  string db_type = 1;
+  string db_protocol = 2;
+}
+
 message ResourceCreateEvent {
   // TODO(espadolini): is a resource the teleport process or the
   // databases/desktops/kube clusters accessed through it?
   string resource_type = 1;
 
   // TODO(espadolini): flags for Discover, autodiscovery, join scripts?
+  string resource_origin = 2;
+  string cloud = 3;
+  DiscoveredDatabaseMetadata database = 4;
 }
 
 // the kind of a "resource" as intended by ResourceHeartbeatEvent

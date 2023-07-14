@@ -41,6 +41,7 @@ import (
 	"github.com/gravitational/teleport/lib/srv/discovery/fetchers"
 	"github.com/gravitational/teleport/lib/srv/discovery/fetchers/db"
 	"github.com/gravitational/teleport/lib/srv/server"
+	usagereporter "github.com/gravitational/teleport/lib/usagereporter/teleport"
 )
 
 var errNoInstances = errors.New("all fetched nodes already enrolled")
@@ -76,6 +77,8 @@ type Config struct {
 	// PollInterval is the cadence at which the discovery server will run each of its
 	// discovery cycles.
 	PollInterval time.Duration
+	// UsageReporter is a service that reports usage events.
+	UsageReporter usagereporter.UsageReporter
 }
 
 func (c *Config) CheckAndSetDefaults() error {
@@ -97,6 +100,9 @@ func (c *Config) CheckAndSetDefaults() error {
 	}
 	if c.Log == nil {
 		c.Log = logrus.New()
+	}
+	if c.UsageReporter == nil {
+		c.UsageReporter = &usagereporter.DiscardUsageReporter{}
 	}
 
 	if c.PollInterval == 0 {
@@ -426,6 +432,7 @@ func (s *Server) handleEC2Instances(instances *server.EC2Instances) error {
 		return trace.NotFound("all fetched nodes already enrolled")
 	}
 
+	s.UsageReporter.AnonymizeAndSubmit(instances.Events()...)
 	s.Log.Debugf("Running Teleport installation on these instances: AccountID: %s, Instances: %s",
 		instances.AccountID, genEC2InstancesLogStr(instances.Instances))
 
@@ -585,6 +592,7 @@ func (s *Server) handleAzureInstances(instances *server.AzureInstances) error {
 		return trace.Wrap(errNoInstances)
 	}
 
+	s.UsageReporter.AnonymizeAndSubmit(instances.Events()...)
 	s.Log.Debugf("Running Teleport installation on these virtual machines: SubscriptionID: %s, VMs: %s",
 		instances.SubscriptionID, genAzureInstancesLogStr(instances.Instances),
 	)

@@ -405,6 +405,9 @@ type TeleportProcess struct {
 
 	// SSHD is used to execute commands to update or validate OpenSSH config.
 	SSHD openssh.SSHD
+
+	// usageReporter is a service that reports usage events.
+	usageReporter usagereporter.UsageReporter
 }
 
 type keyPairKey struct {
@@ -1263,6 +1266,15 @@ func (process *TeleportProcess) getInstanceClient() *auth.Client {
 	process.Lock()
 	defer process.Unlock()
 	return process.instanceClient
+}
+
+func (process *TeleportProcess) SetUsageReporter(reporter usagereporter.UsageReporter) {
+	process.Lock()
+	defer process.Unlock()
+	process.usageReporter = reporter
+	if process.localAuth != nil {
+		process.localAuth.SetUsageReporter(reporter)
+	}
 }
 
 // makeInventoryControlStreamWhenReady is the same as makeInventoryControlStream except that it blocks until

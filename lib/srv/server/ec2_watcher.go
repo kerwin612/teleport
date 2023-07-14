@@ -31,6 +31,7 @@ import (
 	"github.com/gravitational/teleport/lib/cloud"
 	"github.com/gravitational/teleport/lib/labels"
 	"github.com/gravitational/teleport/lib/srv/db/common"
+	usagereporter "github.com/gravitational/teleport/lib/usagereporter/teleport"
 )
 
 const (
@@ -122,6 +123,19 @@ func WithPollInterval(interval time.Duration) Option {
 	return func(w *Watcher) {
 		w.pollInterval = interval
 	}
+}
+
+// Events generates ResourceCreateEvents for these instances.
+func (inst *EC2Instances) Events() []usagereporter.Anonymizable {
+	events := make([]usagereporter.Anonymizable, 0, len(inst.Instances))
+	for i := 0; i < len(inst.Instances); i++ {
+		events = append(events, &usagereporter.ResourceCreateEvent{
+			ResourceType:   "ssh",
+			ResourceOrigin: "cloud",
+			Cloud:          "aws",
+		})
+	}
+	return events
 }
 
 // NewEC2Watcher creates a new EC2 watcher instance.

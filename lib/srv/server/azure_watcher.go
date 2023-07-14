@@ -28,6 +28,7 @@ import (
 	"github.com/gravitational/teleport/lib/cloud"
 	"github.com/gravitational/teleport/lib/cloud/azure"
 	"github.com/gravitational/teleport/lib/services"
+	usagereporter "github.com/gravitational/teleport/lib/usagereporter/teleport"
 )
 
 // AzureInstances contains information about discovered Azure virtual machines.
@@ -48,6 +49,19 @@ type AzureInstances struct {
 	Parameters []string
 	// Instances is a list of discovered Azure virtual machines.
 	Instances []*armcompute.VirtualMachine
+}
+
+// Events generates ResourceCreateEvents for these instances.
+func (inst *AzureInstances) Events() []usagereporter.Anonymizable {
+	events := make([]usagereporter.Anonymizable, 0, len(inst.Instances))
+	for i := 0; i < len(inst.Instances); i++ {
+		events = append(events, &usagereporter.ResourceCreateEvent{
+			ResourceType:   "ssh",
+			ResourceOrigin: "cloud",
+			Cloud:          "azure",
+		})
+	}
+	return events
 }
 
 // NewAzureWatcher creates a new Azure watcher instance.
