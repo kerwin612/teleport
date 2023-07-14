@@ -18,7 +18,7 @@ import { AgentLabel, UnifiedResourceKind } from 'teleport/services/agents';
 
 // Desktop is a remote desktop.
 export type Desktop = {
-  kind: UnifiedResourceKind;
+  kind: 'windows_desktop';
   // OS is the os of this desktop.
   os: 'windows' | 'linux' | 'darwin';
   // Name is name (uuid) of the windows desktop.
@@ -36,7 +36,7 @@ export type Desktop = {
 
 // DesktopService is a Windows Desktop Service.
 export type WindowsDesktopService = {
-  kind: UnifiedResourceKind;
+  kind: 'windows_desktop_service';
   // Name is name (uuid) of the windows desktop service.
   name: string;
   // Hostname is the hostname of the windows desktop service.

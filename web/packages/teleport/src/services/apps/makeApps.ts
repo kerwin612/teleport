@@ -54,6 +54,7 @@ export default function makeApp(json: any): App {
   }
 
   return {
+    kind: 'app',
     id,
     name,
     description,

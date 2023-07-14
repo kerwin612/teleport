@@ -17,7 +17,7 @@
 import { AgentLabel, UnifiedResourceKind } from 'teleport/services/agents';
 
 export interface App {
-  kind: UnifiedResourceKind;
+  kind: 'app';
   id: string;
   name: string;
   description: string;

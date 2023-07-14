@@ -25,7 +25,7 @@ export type Aws = {
 };
 
 export interface Database {
-  kind: UnifiedResourceKind;
+  kind: 'db';
   name: string;
   description: string;
   type: string;

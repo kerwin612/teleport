@@ -16,7 +16,7 @@ limitations under the License.
 import { AgentLabel, UnifiedResourceKind } from 'teleport/services/agents';
 
 export interface Node {
-  kind: UnifiedResourceKind;
+  kind: 'node';
   id: string;
   clusterId: string;
   hostname: string;

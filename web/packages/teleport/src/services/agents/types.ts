@@ -22,8 +22,6 @@ import { Desktop, WindowsDesktopService } from 'teleport/services/desktops';
 
 import type { MfaAuthnResponse } from '../mfa';
 
-export type UnifiedResourceKind = 'app' | 'node' | 'windows_desktop' | 'db';
-
 export type AgentKind =
   | App
   | Database
@@ -31,6 +29,8 @@ export type AgentKind =
   | Kube
   | Desktop
   | WindowsDesktopService;
+
+export type UnifiedResourceKind = AgentKind['kind'];
 
 export type AgentResponse<T extends AgentKind> = {
   agents: T[];

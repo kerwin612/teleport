@@ -16,7 +16,7 @@ limitations under the License.
 
 import { AgentLabel, UnifiedResourceKind } from 'teleport/services/agents';
 export interface Kube {
-  kind: UnifiedResourceKind;
+  kind: 'kube_cluster';
   name: string;
   labels: AgentLabel[];
   users?: string[];

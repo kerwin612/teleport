@@ -29,6 +29,7 @@ import useTeleport from 'teleport/useTeleport';
 
 import { useResources } from './useResources';
 import { ResourceCard } from './ResourceCard';
+import { AgentKind } from 'teleport/services/agents';
 
 export function Resources() {
   const teleCtx = useTeleport();
@@ -61,6 +62,11 @@ export function Resources() {
       )}
     </FeatureBox>
   );
+}
+
+// TODO(bl-nero): this is almost certainly not unique.
+function agentKey(agent: AgentKind): string {
+  return `${agent.kind}:${agent.name}`;
 }
 
 const ResourcesContainer = styled(Flex)`
