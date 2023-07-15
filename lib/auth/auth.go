@@ -4148,7 +4148,6 @@ func (a *Server) SetAccessRequestState(ctx context.Context, params types.AccessR
 		RequestState: params.State.String(),
 		Reason:       params.Reason,
 		Roles:        params.Roles,
-		Persist:      params.Persist,
 	}
 
 	if delegator := apiutils.GetDelegator(ctx); delegator != "" {
@@ -4208,7 +4207,7 @@ func (a *Server) SubmitAccessReview(ctx context.Context, params types.AccessRevi
 		ProposedState: params.Review.ProposedState.String(),
 		Reason:        params.Review.Reason,
 		Reviewer:      params.Review.Author,
-		Persist:       time.Now().Add(24 * time.Hour), //TODO(jakule): fix
+		Persist:       req.GetPersist(),
 	}
 
 	if len(params.Review.Annotations) > 0 {
