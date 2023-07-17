@@ -4,7 +4,7 @@ description: How to configure Teleport database access with ClickHouse.
 ---
 
 The Teleport Clickhouse integration allows you to enroll ClickHouse databases
-with Teleport. 
+with Teleport.
 
 The Teleport Database Service authenticates to ClickHouse using x509
 certificates, which are available for the ClickHouse HTTP and native TCP
@@ -19,13 +19,13 @@ include audit logs for database query activity.
 
 <Admonition type="warning" title="Preview">
 
- Teleport support for ClickHouse is currently in Preview.
+Database access for ClickHouse Database is currently in Preview mode.
 
 </Admonition>
 
 This guide will help you to:
 
-- Install and configure Teleport.
+- Install and configure a Teleport database agent.
 - Set up Teleport to access your self-hosted ClickHouse database.
 - Connect to your database through Teleport.
 
@@ -51,7 +51,7 @@ choose:
 </TabItem>
 <TabItem label="Native TCP">
 - A self-hosted deployment of ClickHouse Server v23.3 or later.
-- The [clickhouse-client](https://clickhouse.com/docs/en/interfaces/cli) installed and added to your system's `PATH` environment variable.
+- The [clickhouse-client](https://clickhouse.com/docs/en/interfaces/cli) installed and added to your user's `PATH` environment variable.
 </TabItem>
 </Tabs>
 
@@ -67,19 +67,20 @@ choose:
 
 Follow the instructions below to generate TLS credentials for your database.
 
+Export Teleport's certificate authority and a generated certificate/key pair
+for host db.example.com with a 1-year validity period:
+
 ```code
-# Export Teleport's certificate authority and a generated certificate/key pair
-# for host db.example.com with a 1-year validity period.
 $ tctl auth sign --format=db --host=clickhouse.example.com --out=server --ttl=8766h
 ```
 
 (!docs/pages/includes/database-access/ttl-note.mdx!)
 
-The command will create three files:
+This command will create three files:
 
-- `server.cas` with Teleport's certificate authority
-- `server.key` with a generated private key
-- `server.crt` with a generated host certificate
+- `server.cas`: Teleport's certificate authority
+- `server.key`: a generated private key
+- `server.crt`: a generated host certificate
 
 ## Step 3/5. Configure ClickHouse
 
@@ -118,19 +119,16 @@ run the Teleport Database Service:
 
 (!docs/pages/includes/install-linux.mdx!)
 
+<Admonition type="note">
+The step below will overwrite an existing configuration file, so if
+you're running multiple services add `--output=stdout` to print the config in
+your terminal, and manually adjust `/etc/teleport.yaml`.
+</Admonition>
+
 On the host where you will run the Teleport Database Service, start Teleport
 with the appropriate configuration.
 
 Generate a configuration file at `/etc/teleport.yaml` for the Database Service:
-
-<Admonition type="note">
-
-The step below will overwrite an existing configuration file, so if
-you're running multiple services add `--output=stdout` to print the config in
-your terminal, and manually adjust `/etc/teleport.yaml`.
-
-</Admonition>
-
 
 <Tabs>
 <TabItem label="HTTP">
@@ -239,7 +237,7 @@ $ tsh db ls
 ```
 
 Create an authenticated proxy tunnel so you can connect to ClickHouse via a GUI
-database client send a request via `curl`:
+database client, or send a request via `curl`:
 
 ```code
 $ tsh proxy db --db-user=alice --tunnel example-clickhouse-http
@@ -274,7 +272,7 @@ ClickHouse database you enrolled earlier:
 
 ```code
 $ tsh login --proxy=<Var name="proxy-address" /> --user=testuser
-# tsh db ls
+$ tsh db ls
 # Name                    Description Allowed Users Labels  Connect
 # ----------------------- ----------- ------------- ------- -------
 # example-clickhouse                  [*]           env=dev
