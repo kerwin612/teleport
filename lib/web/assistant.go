@@ -482,29 +482,43 @@ func runAssistant(h *Handler, w http.ResponseWriter, r *http.Request,
 			return trace.Wrap(err)
 		}
 
-		// Once we know how many tokens were consumed for prompt+completion,
-		// consume the remaining tokens from the rate limiter bucket.
-		extraTokens := usedTokens.Prompt + usedTokens.Completion - lookaheadTokens
-		if extraTokens < 0 {
-			extraTokens = 0
-		}
-		h.assistantLimiter.ReserveN(time.Now(), extraTokens)
+		// Token usage reporting is asynchronous as we might still be streaming
+		// a message, and we don't want to block everything.
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
 
-		usageEventReq := &proto.SubmitUsageEventRequest{
-			Event: &usageeventsv1.UsageEventOneOf{
-				Event: &usageeventsv1.UsageEventOneOf_AssistCompletion{
-					AssistCompletion: &usageeventsv1.AssistCompletionEvent{
-						ConversationId:   conversationID,
-						TotalTokens:      int64(usedTokens.Prompt + usedTokens.Completion),
-						PromptTokens:     int64(usedTokens.Prompt),
-						CompletionTokens: int64(usedTokens.Completion),
+			promptTokens, completionTokens, err := usedTokens.CountAll(ctx)
+			if err != nil {
+				h.log.WithError(err).Warn("Failed to count used tokens")
+				return
+			}
+
+			// Once we know how many tokens were consumed for prompt+completion,
+			// consume the remaining tokens from the rate limiter bucket.
+			extraTokens := promptTokens + completionTokens - lookaheadTokens
+			if extraTokens < 0 {
+				extraTokens = 0
+			}
+			h.assistantLimiter.ReserveN(time.Now(), extraTokens)
+
+			usageEventReq := &proto.SubmitUsageEventRequest{
+				Event: &usageeventsv1.UsageEventOneOf{
+					Event: &usageeventsv1.UsageEventOneOf_AssistCompletion{
+						AssistCompletion: &usageeventsv1.AssistCompletionEvent{
+							ConversationId:   conversationID,
+							TotalTokens:      int64(promptTokens + completionTokens),
+							PromptTokens:     int64(promptTokens),
+							CompletionTokens: int64(completionTokens),
+						},
 					},
 				},
-			},
-		}
-		if err := authClient.SubmitUsageEvent(r.Context(), usageEventReq); err != nil {
-			h.log.WithError(err).Warn("Failed to emit usage event")
-		}
+			}
+			if err := authClient.SubmitUsageEvent(r.Context(), usageEventReq); err != nil {
+				h.log.WithError(err).Warn("Failed to emit usage event")
+			}
+
+		}()
 	}
 
 	h.log.Debug("end assistant conversation loop")
