@@ -139,6 +139,43 @@ expression defined in a string; if we were to extend the supported expressions b
 result in older instances being unable to parse the predicate expression and possibly prevent access to a resource
 that users should be granted access to.
 
+### Backward Compatibility
+
+Migrations have historically been backward incompatible operations. Migrations altered the data in place without
+changing the key or resource version, which can prevent any versions prior to the migration from being able to unmarshal
+the value into the correct representation. The only way to downgrade in this scenario was to restore the backend from a
+backup prior to the migration, attempt to manually roll back the migration, or deleting the entire key range that was
+migrated. By using the phased approach we can guarantee that no two subsequent releases of Teleport are incompatible.
+
+### Testing Migrations
+
+While the framework laid out in this RFD allows migrations to be applied in a deterministic manner, it does not provide
+a uniform rule or process for any code that is impacted by a migration. To ensure that a migration is functional testing
+should consider a wide range of simultaneous versions in a cluster in accordance to our version compatibility matrix.
+Imagine that we are going to introduce a migration in v3.0.0, we must test the following for an extended period of
+time(10m) to ensure all supported versions are functional:
+
+| Auth 1 | Auth 2  | Proxy   | Agents  |
+| ------ | ------- | ------- | ------- |
+| v3.0.0 | v3.0.0  | v3.0.0  | v3.0.0  |
+| v3.0.0 | <v3.0.0 | <v3.0.0 | <v3.0.0 |
+| v3.0.0 | v3.0.0  | <v3.0.0 | <v3.0.0 |
+| v3.0.0 | v3.0.0  | v3.0.0  | <v3.0.0 |
+
+Testing multiple versions of Auth at the same time will help validate that the migration is backward compatible and that
+a rollback is possible. Ensuring that Auth running with the migration and all other instances without the migration is
+also crucial to test since Auth is always the first component updated. If the migration is unknown by the agents it
+should not impact their ability to operate.
+
+### Security
+
+Migrations already exist today, this RFD only proposes a way to make them backward compatible.
+
+### Observability
+
+The existing `teleport_migrations` metric will be reused to record when a migration has been performed. Tracing will
+also be added with a root span created by the migration framework and a child span per migration performed.
+
 ### Alternate Options Considered
 
 #### Disallow unknown fields
@@ -388,40 +425,3 @@ This strategy also does not prevent application logic from having to be aware of
 there is no guarantee that the migrations will be executed immediately. Any new features which rely on the new resource
 will either temporarily not function or need a compatibility mode to prevent the new application logic from kicking in
 until the migration has completed.
-
-### Backward Compatibility
-
-Migrations have historically been backward incompatible operations. Migrations altered the data in place without
-changing the key or resource version, which can prevent any versions prior to the migration from being able to unmarshal
-the value into the correct representation. The only way to downgrade in this scenario was to restore the backend from a
-backup prior to the migration, attempt to manually roll back the migration, or deleting the entire key range that was
-migrated. By using the phased approach we can guarantee that no two subsequent releases of Teleport are incompatible.
-
-### Testing Migrations
-
-While the framework laid out in this RFD allows migrations to be applied in a deterministic manner, it does not provide
-a uniform rule or process for any code that is impacted by a migration. To ensure that a migration is functional testing
-should consider a wide range of simultaneous versions in a cluster in accordance to our version compatibility matrix.
-Imagine that we are going to introduce a migration in v3.0.0, we must test the following for an extended period of
-time(10m) to ensure all supported versions are functional:
-
-| Auth 1 | Auth 2  | Proxy   | Agents  |
-| ------ | ------- | ------- | ------- |
-| v3.0.0 | v3.0.0  | v3.0.0  | v3.0.0  |
-| v3.0.0 | <v3.0.0 | <v3.0.0 | <v3.0.0 |
-| v3.0.0 | v3.0.0  | <v3.0.0 | <v3.0.0 |
-| v3.0.0 | v3.0.0  | v3.0.0  | <v3.0.0 |
-
-Testing multiple versions of Auth at the same time will help validate that the migration is backward compatible and that
-a rollback is possible. Ensuring that Auth running with the migration and all other instances without the migration is
-also crucial to test since Auth is always the first component updated. If the migration is unknown by the agents it
-should not impact their ability to operate.
-
-### Security
-
-Migrations already exist today, this RFD only proposes a way to make them backward compatible.
-
-### Observability
-
-The existing `teleport_migrations` metric will be reused to record when a migration has been performed. Tracing will
-also be added with a root span created by the migration framework and a child span per migration performed.
