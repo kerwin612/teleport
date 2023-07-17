@@ -123,11 +123,14 @@ with the appropriate configuration.
 
 Generate a configuration file at `/etc/teleport.yaml` for the Database Service:
 
-Note that a single Teleport process can run multiple different services, for
-example multiple Database Service agents as well as the SSH Service or Application
-Service. The step below will overwrite an existing configuration file, so if
+<Admonition type="note">
+
+The step below will overwrite an existing configuration file, so if
 you're running multiple services add `--output=stdout` to print the config in
 your terminal, and manually adjust `/etc/teleport.yaml`.
+
+</Admonition>
+
 
 <Tabs>
 <TabItem label="HTTP">
