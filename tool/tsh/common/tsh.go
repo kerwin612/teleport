@@ -340,6 +340,11 @@ type CLIConf struct {
 	// MockHeadlessLogin used in tests to override Headless login handler in teleport client.
 	MockHeadlessLogin client.SSHLoginFunc
 
+	// MockUserHomeDir mocks the user's home dir, useful for overriding Postgres
+	// and MySQL service conf file locations in parallel tests using temp dirs
+	// as the user's "home directory".
+	MockUserHomeDir string
+
 	// HomePath is where tsh stores profiles
 	HomePath string
 
@@ -3690,6 +3695,7 @@ func loadClientConfigFromCLIConf(cf *CLIConf, proxy string) (*client.Config, err
 	c.MockSSOLogin = cf.MockSSOLogin
 	c.MockHeadlessLogin = cf.MockHeadlessLogin
 	c.DTAuthnRunCeremony = cf.DTAuthnRunCeremony
+	c.MockUserHomeDir = cf.MockUserHomeDir
 
 	// Set tsh home directory
 	c.HomePath = cf.HomePath

@@ -375,6 +375,11 @@ type Config struct {
 	// MockHeadlessLogin is used in tests for mocking the Headless login response.
 	MockHeadlessLogin SSHLoginFunc
 
+	// MockUserHomeDir mocks the user's home dir, useful for overriding Postgres
+	// and MySQL service conf file locations in parallel tests using temp dirs
+	// as the user's "home directory".
+	MockUserHomeDir string
+
 	// HomePath is where tsh stores profiles
 	HomePath string
 

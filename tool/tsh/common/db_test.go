@@ -246,7 +246,8 @@ func testDatabaseLogin(t *testing.T) {
 				// default --db-user and --db-name are selected from roles.
 				"db", "login",
 			}, selectors...)
-			err := Run(context.Background(), args, setHomePath(tmpHomePath))
+			err := Run(context.Background(), args, setHomePath(tmpHomePath),
+				setMockUserHomeDir(tmpHomePath))
 			require.NoError(t, err)
 
 			// Fetch the active profile.
@@ -270,7 +271,8 @@ func testDatabaseLogin(t *testing.T) {
 					args := append([]string{
 						"db", "config",
 					}, selectors...)
-					err := Run(context.Background(), args, setHomePath(tmpHomePath))
+					err := Run(context.Background(), args, setHomePath(tmpHomePath),
+						setMockUserHomeDir(tmpHomePath))
 
 					if test.expectErrForConfigCmd {
 						require.Error(t, err)
@@ -284,7 +286,8 @@ func testDatabaseLogin(t *testing.T) {
 					args := append([]string{
 						"db", "env",
 					}, selectors...)
-					err := Run(context.Background(), args, setHomePath(tmpHomePath))
+					err := Run(context.Background(), args, setHomePath(tmpHomePath),
+						setMockUserHomeDir(tmpHomePath))
 
 					if test.expectErrForEnvCmd {
 						require.Error(t, err)
@@ -299,7 +302,8 @@ func testDatabaseLogin(t *testing.T) {
 				args := append([]string{
 					"db", "logout",
 				}, selectors...)
-				err := Run(context.Background(), args, setHomePath(tmpHomePath))
+				err := Run(context.Background(), args, setHomePath(tmpHomePath),
+					setMockUserHomeDir(tmpHomePath))
 				require.NoError(t, err)
 			})
 		})

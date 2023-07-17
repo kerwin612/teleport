@@ -3367,6 +3367,13 @@ func setHomePath(path string) CliOption {
 	}
 }
 
+func setMockUserHomeDir(home string) CliOption {
+	return func(cf *CLIConf) error {
+		cf.MockUserHomeDir = home
+		return nil
+	}
+}
+
 func setKubeConfigPath(path string) CliOption {
 	return func(cf *CLIConf) error {
 		cf.KubeConfigPath = path
