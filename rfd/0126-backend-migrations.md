@@ -78,7 +78,7 @@ time required to progress through each phase by increasing the Cloud release cad
 
 #### Data Migration Phase
 
-Data migrations no longer need to occur during Auth initialization, which will reduce the time it will take a new Auth
+Data migrations no longer need to occur block Auth initialization which will reduce the time it will take a new Auth
 instance to start processing requests. By waiting until Phase 3 to run data migrations when resource mirroring and
 fallback reads are already being performed by all Auth instances the migration can happen in the background.
 
@@ -87,6 +87,88 @@ write caused by the next heartbeat to perform the data migration.
 
 > The above only applies when doing phased migrations. Major releases used by self-hosted customers will still be using
 > the one-shot migration approach will still require running the migration during initialization.
+
+For example, `auth.Init` can discover if running in a Cloud environment via the modules package and launch all
+migrations in an async manner like so:
+
+```go
+func Init(cfg InitConfig, opts ...ServerOption) (*Server, error) {
+  ...
+
+
+  if modules.GetModules().Features().Cloud {
+    go performMigrations()
+  } else {
+    performMigrations()
+  }
+
+  ...
+
+}
+
+```
+
+#### Feature Flags
+
+> Note: these should only be applied within Cloud where we have explicit control over the upgrade sequence
+
+Leveraging feature flags allows the code that handles the migrations to be decoupled from when the migrations actually
+occur. Flags should be defined and provided in a dynamic manner (i.e., environment variable/config option/cli flag) such
+that the flags can be toggled without having to publish a new version of Teleport.
+
+The following is an example backend service to persist `Foo` resources that uses feature flags to read/write new and/or
+old keys based on the flag.
+
+```go
+func (s *FooService) GetFoo(ctx context.Context, name string) (*Foo, error) {
+  if fooFlag == FooUseNewKeyOnly {
+    return s.getNewFoo(ctx, name)
+  }
+
+  if fooFlag == FooUseOldKeyOnly {
+    return s.getOldFoo(ctx, name)
+  }
+
+  if fooFlag == FooMirrorKeys {
+    f, err := s.getNewFoo(ctx, name)
+    if trace.IsNotFound(err) {
+      return s.getOldFoo(ctx, name)
+    }
+    if err != nil {
+      return trace.Wrap(err)
+    }
+
+    return f, nil
+  }
+}
+
+func (s *FooService) UpsertFoo(ctx context.Context, f *Foo) error {
+  if fooFlag == FooUseNewKeyOnly {
+    return s.writeToNewKey(ctx, f)
+  }
+
+  if fooFlag == FooUseOldKeyOnly {
+    return s.writeToOldKey(ctx, f)
+  }
+
+  if fooFlag == FooMirrorKeys {
+    if err := s.writeToNewKey(ctx, f); err != nil {
+      return trace.Wrap(err)
+    }
+
+    return trace.Wrap(s.writeToOldKey(ctx, f))
+  }
+
+
+  return trace.BadParameter("unknown flag %s", fooFlag)
+}
+```
+
+Transitioning between phases would be controlled via the Cloud platform by configuring Teleport appropriately. It is the
+author of the migrations responsibility to create a PR in Cloud which sets the correct phase. Each PR would be reviewed
+and go through the same testing process as any other change made to the Cloud platform. Once all the phases have been
+completed follow up PRs to Teleport and Cloud can be made to remove the feature flags and only use the behavior of the
+end state and to remove the configuration settings from needed to toggle phases.
 
 ### Minor/Additive changes
 
@@ -133,11 +215,11 @@ unknown Bar kind. This is particularly troublesome when the resource is involved
 reasonable decision the old Auth server can make in this case is to deny access to prevent any possible bypasses as a
 result of not knowing how to process the new Bar.
 
-This is also true for fields which are just scalar types, adding a new value to a field that is a string will result
-in older instances being unable to parse the field. For example, there are several resources which take a predicate
-expression defined in a string; if we were to extend the supported expressions by adding new function(s) it would
-result in older instances being unable to parse the predicate expression and possibly prevent access to a resource
-that users should be granted access to.
+This is also true for fields which are just scalar types, adding a new value to a field that is a string will result in
+older instances being unable to parse the field. For example, there are several resources which take a predicate
+expression defined in a string; if we were to extend the supported expressions by adding new function(s) it would result
+in older instances being unable to parse the predicate expression and possibly prevent access to a resource that users
+should be granted access to.
 
 ### Backward Compatibility
 
@@ -382,13 +464,7 @@ losing changes made by a user. Resources which are updated based on presence are
 conditional operations due to the amount of stress that may put on backends.
 
 <details open><summary>Backend changes</summary>
-
-```diff
-type Backend interface {
-  ...
-+ ConditionalPut(ctx context.Context, i Item) (*Lease, error)
-+ ConditionalUpdate(ctx context.Context, i Item) (*Lease, error)
-+ ConditionalDelete(ctx context.Context, key []byte, rev string) (*Lease, error)
+g) (*Lease, error)
 }
 ```
 
