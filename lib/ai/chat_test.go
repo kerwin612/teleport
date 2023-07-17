@@ -119,8 +119,10 @@ func TestChat_PromptTokens(t *testing.T) {
 			_, tokenCount, err := chat.Complete(ctx, "", func(aa *model.AgentAction) {})
 			require.NoError(t, err)
 
-			ctx, _ = context.WithTimeout(ctx, 1*time.Second)
+			ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
+			defer cancel()
 			prompt, completion, err := tokenCount.CountAll(ctx)
+			require.NoError(t, err)
 			usedTokens := prompt + completion
 			require.Equal(t, tt.want, usedTokens)
 		})

@@ -92,7 +92,6 @@ type executionState struct {
 	humanMessage      openai.ChatCompletionMessage
 	intermediateSteps []AgentAction
 	observations      []string
-	tokensUsed        *TokensUsed
 	tokenCount        *TokenCount
 }
 
@@ -215,10 +214,9 @@ func (a *Agent) takeNextStep(ctx context.Context, state *executionState, progres
 		}
 
 		completion := &CompletionCommand{
-			TokensUsed: newTokensUsed_Cl100kBase(),
-			Command:    input.Command,
-			Nodes:      input.Nodes,
-			Labels:     input.Labels,
+			Command: input.Command,
+			Nodes:   input.Nodes,
+			Labels:  input.Labels,
 		}
 
 		log.Tracef("agent decided on command execution, let's translate to an agentFinish")
@@ -361,7 +359,7 @@ func parsePlanningOutput(deltas <-chan string) (*AgentAction, *agentFinish, Toke
 
 		if strings.HasPrefix(text, finalResponseHeader) {
 			parts := make(chan string)
-			streamingTokenCounter := NewStreamingMessageTokenCounter(text)
+			streamingTokenCounter := NewAsynchronousTokenCounter(text)
 			go func() {
 				defer close(parts)
 				defer func() {
@@ -385,7 +383,7 @@ func parsePlanningOutput(deltas <-chan string) (*AgentAction, *agentFinish, Toke
 		}
 	}
 
-	completionTokenCount, err := NewMessageTokenCounter(text)
+	completionTokenCount, err := NewSynchronousTokenCounter(text)
 	if err != nil {
 		return nil, nil, nil, trace.Wrap(err)
 	}
