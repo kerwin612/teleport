@@ -51,12 +51,15 @@ exception and not the norm.
 For major breaking changes (i.e., splitting a resource into multiple resources), resources must be migrated to a new
 key. For example, to migrate the data stored in `some/path/to/resource/<ID>` we must leave the original value at
 `some/path/to/resource/<ID>` as is, and write the migrated value to `some/new/path/to/resource/<ID>`. Keys should be
-versioned to determine which version of a resource exists at any given key range. A key prefix of
-`/type/version/subkind/name` should be used where possible to have uniformity. For example, if nodes were migrated from
-`/nodes/default/<UUID>` it should be to `/nodes/v2/default/<UUID>`.
+versioned to determine which version of a resource exists at any given key range. For example, if nodes were migrated
+from `/nodes/default/<UUID>` it should be to `/nodes/v2/default/<UUID>`.
 
-Any breaking changes to a resource must also bump the API version of the service which interacts with that resource to
-ensure existing code does not break and to make it clear when new clients are choosing to use the new behavior.
+Any breaking changes to a resource must also result in a major version bump to its corresponding API. For example, if we
+were to make a breaking change to
+[`types.LoginRule`](https://github.com/gravitational/teleport/blob/336518e0b51e118679c13a9a3a34dcff0fc8b5ad/api/proto/teleport/loginrule/v1/loginrule.proto)
+then we would also need to bump the package of the
+[`types.LoginRuleService`](https://github.com/gravitational/teleport/blob/336518e0b51e118679c13a9a3a34dcff0fc8b5ad/api/proto/teleport/loginrule/v1/loginrule_service.proto)
+from v1 to v2.
 
 To perform the migration which allows for backward compatibility with the previous version, each step of the migration
 will be done in a phase. Each phase can be gated by a feature flag which is updated to the next phase in the process on
@@ -110,7 +113,7 @@ Auth then there is no opportunity for new fields to be accessed.
 
 ### Changing the meaning of a field
 
-Altering or extending the capabilities of a field will result in backward compatible behavior. Imagine the following
+Altering or extending the capabilities of a field will result in backward incompatible behavior. Imagine the following
 resource:
 
 ```protobuf
@@ -130,12 +133,18 @@ unknown Bar kind. This is particularly troublesome when the resource is involved
 reasonable decision the old Auth server can make in this case is to deny access to prevent any possible bypasses as a
 result of not knowing how to process the new Bar.
 
-This is also true for extending the supported predicate functions available for any existing field. Older Auth instances
-will be unable to parse the new expression.
+This is also true for fields which are just scalar types, adding a new value to a field that is a string will result
+in older instances being unable to parse the field. For example, there are several resources which take a predicate
+expression defined in a string; if we were to extend the supported expressions by adding new function(s) it would
+result in older instances being unable to parse the predicate expression and possibly prevent access to a resource
+that users should be granted access to.
 
 ### Alternate Options Considered
 
 #### Disallow unknown fields
+
+> This was rejected due to the inability to accurately detect unknown fields in RPCs and elevated risk of bricking a
+> cluster when rolling back due to being unable to read a resource from the backend.
 
 We can explicitly opt-in to rejecting any backend reads or RPC requests which have unknown fields. Backend reads can
 determine unknown if a stored resource has unknown fields by enabling `DisallowUnknownFields` on the json decoder. RPC
@@ -148,6 +157,10 @@ representation. This would also break any agents or clients running a newer vers
 since they may have a version of `api` that contains updated proto messages.
 
 #### Stricter Resource Versioning
+
+> This option was rejected due to its scope and complexity. The machinery required for this option to work would take a
+> long time and be a massive overhaul. Changing resource versioning to user a [major].[minor] schema would also make
+> resource versions even more confusing for users.
 
 Without a more concrete strategy for resource versioning, it is impossible to have different versions of Auth running
 concurrently. Auth needs to be aware of the exact version of a resource that clients are requesting to determine if the
@@ -351,161 +364,12 @@ resource at the old key must also have its version appended with `+downgraded`. 
 v1.1 to v2 via a migration should update the old resource to now have a version of `v1.1+downgraded`. This is an
 indication to older Auth servers that the resource is now read only.
 
-###### Implementation Details
-
-Every time Auth starts it will evaluate all known migrations against the cluster migration history and apply any
-outstanding migrations. This will allow clusters to skip major versions when upgrading and still have the correct
-migrations applied in order. However, due to the fact that migration history is not persisted today, upgrades must be
-done in sequence up until the very first release that contains the changes outlined in this RFD.
-
-All migrations will be performed in a background goroutine that is spawned from `auth.Init` to prevent them from
-blocking Auth initialization. For each migration that needs to be applied Auth will attempt to acquire the lock
-`/migrations/lock/<migration_number>` for the duration of that migration execution to prevent simultaneous instances
-from running the same migration. When Auth acquires the lock it must check the status of the migration to determine if
-that migration was already completed by another instance, if it was then no action is to be taken. If another instance
-of Auth attempted the migration but failed, then the next instance that gets the lock should attempt the migration.
-After successfully applying a migration Auth will store that migrations status in the backend and then move on to the
-next migration until none remain, repeating the same process for each migration.
-
-In the event that all Auth instances fail to complete a single migration, no further migrations may be applied, and the
-migration routine MUST exit. Logs should be emitted that indicate why the migration failed, the `teleport_migrations`
-metric should indicate a failure to allow admins to enhance observability. Cluster admins can also interrogate the
-migrations via `tctl migrations ls` to see any errors associated with a particular migration. After the issue is
-resolved through manual intervention `tctl migrations apply` can be invoked to kick off the migration process mentioned
-above.
-
-##### Migrations
-
-A new framework will be created to declare migrations, perform migrations in the correct order, and persist migration
-status. A migration must implement the following interface:
-
-```go
-type Migration interface {
-    // Up applies a migration on the provided [backend.Backend].
-    Up(ctx context.Context, b backend.Backend) error
-    // Down undoes a migration on the provided [backend.Backend].
-    Down(ctx context.Context, b backend.Backend) error
-}
-```
-
-A migration that converts nodes to be stored in binary proto instead of json might look like the following:
-
-<details open><summary>Example migration</summary>
-
-```go
-// exampleMigration converts the encoding used to
-// store [types.Server] from json to proto.
-type exampleMigraion struct {}
-
-// Up converts any existing [types.Server]
-func (e exampleMigration) Up(ctx context.Context, b backend.Backend) error {
-	oldSvc, err := generic.NewService(&generic.ServiceConfig[types.Server]{
-		Backend:       b,
-		ResourceKind:  types.KindNode,
-		BackendPrefix: backend.Key(nodesPrefix, namespace),
-		MarshalFunc:   services.MarshalServer,
-		UnmarshalFunc: services.UnmarshalServer,
-	})
-	if err != nil {
-		return trace.Wrap(err)
-	}
-
-	newSvc, err := generic.NewService(&generic.ServiceConfig[types.Server]{
-		Backend:       b,
-		ResourceKind:  types.KindNode,
-		BackendPrefix: backend.Key(nodesPrefixV2, namespace),
-		MarshalFunc:   func(t types.Server) ([]byte, error) {
-			return proto.Marshal(t)
-		}
-		UnmarshalFunc: func(types.Server) ([]byte, error) { return nil, nil }
-	})
-	if err != nil {
-		return trace.Wrap(err)
-	}
-
-	servers, err := oldSvc.GetResources(ctx)
-	if err != nil {
-		if trace.IsNotFound(err) {
-			return nil
-		}
-		return trace.Wrap(err)
-	}
-
-	for _, s := range servers {
-		if err := newSvc.CreateResource(ctx, s); err != nil {
-			return trace.Wrap(err)
-		}
-	}
-
-	return nil
-}
-
-func (e exampleMigration) Down(ctx context.Context, b backend.Backend) error {
-    oldSvc, err := generic.NewService(&generic.ServiceConfig[types.Server]{
-    Backend:       b,
-	ResourceKind:  types.KindNode,BackendPrefix: backend.Key(nodesPrefix, namespace),
-    MarshalFunc:   services.MarshalServer,
-    UnmarshalFunc: services.UnmarshalServer,
-    })
-    if err != nil {
-        return trace.Wrap(err)
-    }
-
-    newSvc, err := generic.NewService(&generic.ServiceConfig[types.Server]{
-    Backend:       b,
-    ResourceKind:  types.KindNode,
-    BackendPrefix: backend.Key(nodesPrefixV2, namespace),;''
-    MarshalFunc:   func(t types.Server) ([]byte, error) {
-        return proto.Marshal(t)
-    }
-    UnmarshalFunc: func(b []byte) (types.Server, error) {
-        var s types.ServerV2
-        if err :=  proto.Unmarshal(b, s); err != nil {
-            return nil, err,
-        }
-        return s, nil
-    })
-    if err != nil {
-        return trace.Wrap(err)
-    }
-
-    servers, err := newSvc.GetResources(ctx)
-    if err != nil {
-        if trace.IsNotFound(err) {
-            return nil
-        }
-        return trace.Wrap(err)
-    }
-
-    for _, s := range servers {
-        if err := oldSvc.CreateResource(ctx, s); err != nil {
-            return trace.Wrap(err)
-        }
-	}
-
-    return nil
-}
-```
-
-</details>
-
-Migration registration requires the version of the migration and the implementation, if a migration with the same
-version is already exists then registration will fail.
-
-```go
-    if err := migrate.Register(1, exampleMigration{}); err != nil {
-		return err
-    }
-```
-
-##### Backend Services
-
-The generic backend service will be extended to handle support for optimistic locking, performing version checking, and
-downgrading resources. This will reduce the burden on each custom backend service and ease the developer experience. To
-opt in to the new behavior a resources backend service just needs to ensure that it is using the
-`lib/services/generic.Service`.
-
 #### Deferred Migrations
+
+> This was rejected due to challenges detecting when the right time to perform migrations is. Relying on presence
+> information may be inaccurate and result in the migration starting prematurely. The Cloud only variant which relied on
+> coordination between Tenant Operator and Auth would not scale without an authenticated control interface available for
+> the two components to communicate over.
 
 To prevent any migrations from impacting older versions of Teleport we can defer execution of migrations until all
 versions of Auth are running a version which understands the migration. Determining peer versions is not possible today,
