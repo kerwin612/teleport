@@ -5,8 +5,9 @@ import { Button, Flex, Pill, Text } from 'design';
 
 import { AgentKind } from 'teleport/services/agents';
 import { CheckboxInput } from 'design/Checkbox';
-import { icons } from 'teleport/Discover/SelectResource/icons';
+import { resourceIcons } from 'design/ResourceIcons';
 import * as Icons from 'design/Icon';
+import { Database } from 'teleport/services/databases';
 
 const ResourceDetails = styled(Flex)`
   flex-grow: 1;
@@ -20,10 +21,11 @@ type Props = {
   resource: AgentKind;
 };
 export const ResourceCard = ({ resource }: Props) => {
+  const ResIcon = agentIcon(resource);
   return (
     <CardContainer p={3} alignItems="start">
       <CheckboxInput type="checkbox"></CheckboxInput>
-      {icons.Application}
+      <ResIcon width="60px" height="60px" />
       <ResourceDetails flexDirection="column">
         <Flex flexDirection="row">
           <ResourceName>{agentName(resource)}</ResourceName>
@@ -49,8 +51,21 @@ function agentType(agent: AgentKind) {
 }
 
 function agentName(agent: AgentKind) {
-  return agent.kind + (agent.kind === 'node' ? agent.hostname : agent.name);
+  return agent.kind === 'node' ? agent.hostname : agent.name;
 }
+
+function agentIcon(agent: AgentKind) {
+  switch (agent.kind) {
+    case 'app':
+      return resourceIcons.Application;
+    case 'db':
+      return resourceIcons.Server;
+    default:
+      return resourceIcons.Server;
+  }
+}
+
+function databaseIcon(db: Database) {}
 
 export const CardContainer = styled(Flex)`
   border-top: 2px solid ${props => props.theme.colors.spotBackground[0]};
