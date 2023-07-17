@@ -121,13 +121,13 @@ run the Teleport Database Service:
 On the host where you will run the Teleport Database Service, start Teleport
 with the appropriate configuration.
 
+Generate a configuration file at `/etc/teleport.yaml` for the Database Service:
+
 Note that a single Teleport process can run multiple different services, for
 example multiple Database Service agents as well as the SSH Service or Application
 Service. The step below will overwrite an existing configuration file, so if
 you're running multiple services add `--output=stdout` to print the config in
 your terminal, and manually adjust `/etc/teleport.yaml`.
-
-Generate a configuration file at `/etc/teleport.yaml` for the Database Service:
 
 <Tabs>
 <TabItem label="HTTP">
@@ -159,36 +159,7 @@ $ teleport db configure create \
 </TabItem>
 </Tabs>
 
-Configure the Database Service to start automatically when the host boots up by
-creating a systemd service for it. The instructions depend on how you installed
-the Database Service.
-
-<Tabs>
-<TabItem label="Package Manager">
-
-On the host where you will run the Teleport Database Service, start Teleport:
-
-```code
-$ sudo systemctl enable teleport
-$ sudo systemctl start teleport
-```
-
-</TabItem>
-<TabItem label="TAR Archive">
-
-On the host where you will run the Teleport Database Service, create a systemd
-service configuration for Teleport, enable the Teleport service, and start
-Teleport:
-
-```code
-$ sudo teleport install systemd -o /etc/systemd/system/teleport.service
-$ sudo systemctl enable teleport
-$ sudo systemctl start teleport
-```
-
-</TabItem>
-</Tabs>
-
+(!docs/pages/includes/start-teleport.mdx service="the Teleport Database Service"!)
 
 </TabItem>
 <TabItem label="Kubernetes Cluster">
