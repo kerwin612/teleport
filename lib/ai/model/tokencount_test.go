@@ -34,7 +34,7 @@ func TestAsynchronousTokenCount_Finished(t *testing.T) {
 }
 
 // This test checks that TokenCount() waits properly on a count still in
-// progress. It checks the scenario in which the context gets cancelled first
+// progress. It checks the scenario in which the context gets canceled first
 func TestAsynchronousTokenCount_WaitingCancel(t *testing.T) {
 	t.Parallel()
 
@@ -75,6 +75,9 @@ func TestAsynchronousTokenCount_WaitingFinish(t *testing.T) {
 
 	// We make sure the routine is stuck waiting
 	require.Eventually(t, func() bool {
+		// we acquire lock to avoid a race with the routine waiting
+		tc.mutex.Lock()
+		defer tc.mutex.Unlock()
 		return len(tc.waiting) > 0
 	}, 200*time.Millisecond, 20*time.Millisecond)
 
