@@ -20,6 +20,8 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/gravitational/trace"
@@ -373,6 +375,55 @@ func (r remoteSite) GetClusterNetworkingConfig(ctx context.Context, opts ...serv
 	return cfg, trace.Wrap(err)
 }
 
+// isASCII is a helper for deciding if a string consists purely of ASCII characters.
+func isASCII(s string) bool {
+	for _, c := range s {
+		if c > unicode.MaxASCII {
+			return false
+		}
+	}
+	return true
+}
+
+// sshPrincipal is a helper used to perform a special kind of case-insensitive comparison. SSH certs do not generally
+// treat principals/hostnames in a case-insensitive manner. This is often worked-around by forcing all principals and
+// hostnames to be lowercase. For backwards-compatibility reasons, teleport must support case-sensitive routing by default
+// and can't do thi. Instead, teleport nodes whose hostnames contain uppercase letters will present certs that include both
+// the literal hostname and a lowerer version of the hostname, meaning that it is sane to route a request for host 'foo' to
+// host 'Foo', but it is not sane to route a request for host 'Bar' to host 'bar'.
+type sshPrincipal string
+
+// MatchesTargetHost checks if it is sane to route the a request for the given target hostname to a node with
+// this principal advertised as its hostname.
+func (principal sshPrincipal) MatchesTargetHost(host string) bool {
+	if len(principal) != len(host) {
+		return false
+	}
+
+	// the below is modeled off of the fast ASCII path of strings.EqualFold
+	for i := 0; i < len(principal) && i < len(host); i++ {
+		pr := principal[i]
+		hr := host[i]
+		if pr|hr >= utf8.RuneSelf {
+			// not pure-ascii, fallback to literal comparison
+			return string(principal) == host
+		}
+
+		// Easy case.
+		if pr == hr {
+			continue
+		}
+
+		// Check if principal is an upper-case equivalent to host.
+		if 'A' <= pr && pr <= 'Z' && hr == pr+'a'-'A' {
+			continue
+		}
+		return false
+	}
+
+	return true
+}
+
 // getServer attempts to locate a node matching the provided host and port in
 // the provided site.
 func getServer(ctx context.Context, host, port string, site site) (types.Server, error) {
@@ -381,8 +432,16 @@ func getServer(ctx context.Context, host, port string, site site) (types.Server,
 	}
 
 	strategy := types.RoutingStrategy_UNAMBIGUOUS_MATCH
+	matchPrincipal := func(principal string) bool {
+		return host == principal
+	}
 	if cfg, err := site.GetClusterNetworkingConfig(ctx); err == nil {
 		strategy = cfg.GetRoutingStrategy()
+		if cfg.GetCaseInsensitiveRouting() && isASCII(host) {
+			matchPrincipal = func(principal string) bool {
+				return sshPrincipal(principal).MatchesTargetHost(host)
+			}
+		}
 	}
 
 	_, err := uuid.Parse(host)
@@ -406,7 +465,7 @@ func getServer(ctx context.Context, host, port string, site site) (types.Server,
 		// if the server has connected over a reverse tunnel
 		// then match only by hostname
 		if server.GetUseTunnel() {
-			return host == server.GetHostname()
+			return matchPrincipal(server.GetHostname())
 		}
 
 		ip, nodePort, err := net.SplitHostPort(server.GetAddr())
@@ -414,7 +473,7 @@ func getServer(ctx context.Context, host, port string, site site) (types.Server,
 			return false
 		}
 
-		if (host == ip || host == server.GetHostname() || slices.Contains(ips, ip)) &&
+		if (host == ip || matchPrincipal(server.GetHostname()) || slices.Contains(ips, ip)) &&
 			(port == "" || port == "0" || port == nodePort) {
 			return true
 		}

@@ -99,6 +99,13 @@ func TestGetServers(t *testing.T) {
 		},
 	}
 
+	unambiguousInsensitiveCfg := types.ClusterNetworkingConfigV2{
+		Spec: types.ClusterNetworkingConfigSpecV2{
+			RoutingStrategy:        types.RoutingStrategy_UNAMBIGUOUS_MATCH,
+			CaseInsensitiveRouting: true,
+		},
+	}
+
 	hostID := uuid.NewString()
 	const ec2ID = "012345678901-i-01234567890abcdef"
 
@@ -166,6 +173,21 @@ func TestGetServers(t *testing.T) {
 			name:     "lion",
 			hostname: "lion",
 			addr:     "lion.roar",
+		},
+		{
+			name:     "platypus1",
+			hostname: "Platypus",
+			tunnel:   true,
+		},
+		{
+			name:     "platypus2",
+			hostname: "platypus",
+			tunnel:   true,
+		},
+		{
+			name:     "capybara1",
+			hostname: "Capybara",
+			tunnel:   true,
 		},
 	})
 
@@ -275,6 +297,27 @@ func TestGetServers(t *testing.T) {
 			site:         testSite{cfg: &unambiguousCfg, nodes: servers},
 			host:         "lion",
 			errAssertion: require.NoError,
+			serverAssertion: func(t *testing.T, srv types.Server) {
+				require.Empty(t, srv)
+			},
+		},
+		{
+			name:         "case-insensitive match",
+			site:         testSite{cfg: &unambiguousInsensitiveCfg, nodes: servers},
+			host:         "capybara",
+			errAssertion: require.NoError,
+			serverAssertion: func(t *testing.T, srv types.Server) {
+				require.NotNil(t, srv)
+				require.Equal(t, "Capybara", srv.GetHostname())
+			},
+		},
+		{
+			name: "case-insensitive ambiguous",
+			site: testSite{cfg: &unambiguousInsensitiveCfg, nodes: servers},
+			host: "platypus",
+			errAssertion: func(t require.TestingT, err error, i ...interface{}) {
+				require.ErrorIs(t, err, trace.NotFound(teleport.NodeIsAmbiguous))
+			},
 			serverAssertion: func(t *testing.T, srv types.Server) {
 				require.Empty(t, srv)
 			},
@@ -575,5 +618,61 @@ func TestRouter_DialSite(t *testing.T) {
 			conn, err := router.DialSite(ctx, tt.cluster, nil, nil)
 			tt.assertion(t, conn, err)
 		})
+	}
+}
+
+func TestSSHPrincipal(t *testing.T) {
+	tts := []struct {
+		desc      string
+		principal sshPrincipal
+		target    string
+		match     bool
+	}{
+		{
+			desc:      "upper-eq",
+			principal: "Foo",
+			target:    "Foo",
+			match:     true,
+		},
+		{
+			desc:      "lower-eq",
+			principal: "foo",
+			target:    "foo",
+			match:     true,
+		},
+		{
+			desc:      "lower-target-match",
+			principal: "Foo",
+			target:    "foo",
+			match:     true,
+		},
+		{
+			desc:      "upper-target-mismatch",
+			principal: "foo",
+			target:    "Foo",
+			match:     false,
+		},
+		{
+			desc:      "all-upper-mismatch",
+			principal: "Foo",
+			target:    "fOO",
+			match:     false,
+		},
+		{
+			desc:      "non-ascii-match",
+			principal: "🌲",
+			target:    "🌲",
+			match:     true,
+		},
+		{
+			desc:      "non-ascii-mismatch",
+			principal: "🌲",
+			target:    "🔥",
+			match:     false,
+		},
+	}
+
+	for _, tt := range tts {
+		require.Equal(t, tt.match, tt.principal.MatchesTargetHost(tt.target), "desc=%q", tt.desc)
 	}
 }

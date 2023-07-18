@@ -112,6 +112,9 @@ type ClusterNetworkingConfig interface {
 
 	// SetAssistCommandExecutionWorkers sets the number of parallel command execution workers for Assist
 	SetAssistCommandExecutionWorkers(n int32)
+
+	// GetCaseInsensitiveRouting gets the case-insensitive routing option.
+	GetCaseInsensitiveRouting() bool
 }
 
 // NewClusterNetworkingConfigFromConfigFile is a convenience method to create
@@ -389,6 +392,11 @@ func (c *ClusterNetworkingConfigV2) GetAssistCommandExecutionWorkers() int32 {
 // SetAssistCommandExecutionWorkers sets the number of parallel command execution workers for Assist
 func (c *ClusterNetworkingConfigV2) SetAssistCommandExecutionWorkers(n int32) {
 	c.Spec.AssistCommandExecutionWorkers = n
+}
+
+// GetCaseInsensitiveRouting gets the case-insensitive routing option.
+func (c *ClusterNetworkingConfigV2) GetCaseInsensitiveRouting() bool {
+	return c.Spec.CaseInsensitiveRouting
 }
 
 // MarshalYAML defines how a proxy listener mode should be marshaled to a string
