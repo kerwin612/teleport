@@ -48,20 +48,24 @@ message SSOCreateEvent {
   string connector_type = 1;
 }
 
-message DiscoveredDatabaseMetadata {
-  string db_type = 1;
-  string db_protocol = 2;
+// ResourceCreateEvent is emitted when an auto-discovered resource is created.
+message ResourceCreateEvent {
+  // resource_type is the type of resource ("node", "node.openssh", "db", "k8s").
+  string resource_type = 1;
+  // resource_origin is the origin of the resource ("cloud").
+  string resource_origin = 2;
+  // cloud is the cloud provider the resource came from ("AWS", "Azure", "GCP").
+  string cloud = 3;
+  // database contains additional database information if resource_type == "db".
+  DiscoveredDatabaseMetadata database = 4;
 }
 
-message ResourceCreateEvent {
-  // TODO(espadolini): is a resource the teleport process or the
-  // databases/desktops/kube clusters accessed through it?
-  string resource_type = 1;
-
-  // TODO(espadolini): flags for Discover, autodiscovery, join scripts?
-  string resource_origin = 2;
-  string cloud = 3;
-  DiscoveredDatabaseMetadata database = 4;
+// DiscoveredDatabaseMetadata contains additional database information.
+message DiscoveredDatabaseMetadata {
+  // database type.
+  string db_type = 1;
+  // database protocol.
+  string db_protocol = 2;
 }
 
 // the kind of a "resource" as intended by ResourceHeartbeatEvent

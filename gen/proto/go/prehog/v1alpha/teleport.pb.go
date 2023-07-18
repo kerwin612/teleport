@@ -775,79 +775,26 @@ func (x *SSOCreateEvent) GetConnectorType() string {
 	return ""
 }
 
-type DiscoveredDatabaseMetadata struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	DbType     string `protobuf:"bytes,1,opt,name=db_type,json=dbType,proto3" json:"db_type,omitempty"`
-	DbProtocol string `protobuf:"bytes,2,opt,name=db_protocol,json=dbProtocol,proto3" json:"db_protocol,omitempty"`
-}
-
-func (x *DiscoveredDatabaseMetadata) Reset() {
-	*x = DiscoveredDatabaseMetadata{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_prehog_v1alpha_teleport_proto_msgTypes[2]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *DiscoveredDatabaseMetadata) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DiscoveredDatabaseMetadata) ProtoMessage() {}
-
-func (x *DiscoveredDatabaseMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_prehog_v1alpha_teleport_proto_msgTypes[2]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DiscoveredDatabaseMetadata.ProtoReflect.Descriptor instead.
-func (*DiscoveredDatabaseMetadata) Descriptor() ([]byte, []int) {
-	return file_prehog_v1alpha_teleport_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *DiscoveredDatabaseMetadata) GetDbType() string {
-	if x != nil {
-		return x.DbType
-	}
-	return ""
-}
-
-func (x *DiscoveredDatabaseMetadata) GetDbProtocol() string {
-	if x != nil {
-		return x.DbProtocol
-	}
-	return ""
-}
-
+// ResourceCreateEvent is emitted when an auto-discovered resource is created.
 type ResourceCreateEvent struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// TODO(espadolini): is a resource the teleport process or the
-	// databases/desktops/kube clusters accessed through it?
+	// resource_type is the type of resource ("node", "node.openssh", "db", "k8s").
 	ResourceType string `protobuf:"bytes,1,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
-	// TODO(espadolini): flags for Discover, autodiscovery, join scripts?
-	ResourceOrigin string                      `protobuf:"bytes,2,opt,name=resource_origin,json=resourceOrigin,proto3" json:"resource_origin,omitempty"`
-	Cloud          string                      `protobuf:"bytes,3,opt,name=cloud,proto3" json:"cloud,omitempty"`
-	Database       *DiscoveredDatabaseMetadata `protobuf:"bytes,4,opt,name=database,proto3" json:"database,omitempty"`
+	// resource_origin is the origin of the resource ("cloud").
+	ResourceOrigin string `protobuf:"bytes,2,opt,name=resource_origin,json=resourceOrigin,proto3" json:"resource_origin,omitempty"`
+	// cloud is the cloud provider the resource came from ("AWS", "Azure", "GCP").
+	Cloud string `protobuf:"bytes,3,opt,name=cloud,proto3" json:"cloud,omitempty"`
+	// database contains additional database information if resource_type == "db".
+	Database *DiscoveredDatabaseMetadata `protobuf:"bytes,4,opt,name=database,proto3" json:"database,omitempty"`
 }
 
 func (x *ResourceCreateEvent) Reset() {
 	*x = ResourceCreateEvent{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_prehog_v1alpha_teleport_proto_msgTypes[3]
+		mi := &file_prehog_v1alpha_teleport_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -860,7 +807,7 @@ func (x *ResourceCreateEvent) String() string {
 func (*ResourceCreateEvent) ProtoMessage() {}
 
 func (x *ResourceCreateEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_prehog_v1alpha_teleport_proto_msgTypes[3]
+	mi := &file_prehog_v1alpha_teleport_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -873,7 +820,7 @@ func (x *ResourceCreateEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceCreateEvent.ProtoReflect.Descriptor instead.
 func (*ResourceCreateEvent) Descriptor() ([]byte, []int) {
-	return file_prehog_v1alpha_teleport_proto_rawDescGZIP(), []int{3}
+	return file_prehog_v1alpha_teleport_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ResourceCreateEvent) GetResourceType() string {
@@ -902,6 +849,64 @@ func (x *ResourceCreateEvent) GetDatabase() *DiscoveredDatabaseMetadata {
 		return x.Database
 	}
 	return nil
+}
+
+// DiscoveredDatabaseMetadata contains additional database information.
+type DiscoveredDatabaseMetadata struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// database type.
+	DbType string `protobuf:"bytes,1,opt,name=db_type,json=dbType,proto3" json:"db_type,omitempty"`
+	// database protocol.
+	DbProtocol string `protobuf:"bytes,2,opt,name=db_protocol,json=dbProtocol,proto3" json:"db_protocol,omitempty"`
+}
+
+func (x *DiscoveredDatabaseMetadata) Reset() {
+	*x = DiscoveredDatabaseMetadata{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_prehog_v1alpha_teleport_proto_msgTypes[3]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DiscoveredDatabaseMetadata) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DiscoveredDatabaseMetadata) ProtoMessage() {}
+
+func (x *DiscoveredDatabaseMetadata) ProtoReflect() protoreflect.Message {
+	mi := &file_prehog_v1alpha_teleport_proto_msgTypes[3]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DiscoveredDatabaseMetadata.ProtoReflect.Descriptor instead.
+func (*DiscoveredDatabaseMetadata) Descriptor() ([]byte, []int) {
+	return file_prehog_v1alpha_teleport_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *DiscoveredDatabaseMetadata) GetDbType() string {
+	if x != nil {
+		return x.DbType
+	}
+	return ""
+}
+
+func (x *DiscoveredDatabaseMetadata) GetDbProtocol() string {
+	if x != nil {
+		return x.DbProtocol
+	}
+	return ""
 }
 
 // a heartbeat for a resource served by a Teleport instance outside of the
@@ -4875,25 +4880,25 @@ var file_prehog_v1alpha_teleport_proto_rawDesc = []byte{
 	0x65, 0x49, 0x64, 0x22, 0x37, 0x0a, 0x0e, 0x53, 0x53, 0x4f, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65,
 	0x45, 0x76, 0x65, 0x6e, 0x74, 0x12, 0x25, 0x0a, 0x0e, 0x63, 0x6f, 0x6e, 0x6e, 0x65, 0x63, 0x74,
 	0x6f, 0x72, 0x5f, 0x74, 0x79, 0x70, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0d, 0x63,
-	0x6f, 0x6e, 0x6e, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x54, 0x79, 0x70, 0x65, 0x22, 0x56, 0x0a, 0x1a,
-	0x44, 0x69, 0x73, 0x63, 0x6f, 0x76, 0x65, 0x72, 0x65, 0x64, 0x44, 0x61, 0x74, 0x61, 0x62, 0x61,
-	0x73, 0x65, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x12, 0x17, 0x0a, 0x07, 0x64, 0x62,
-	0x5f, 0x74, 0x79, 0x70, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x64, 0x62, 0x54,
-	0x79, 0x70, 0x65, 0x12, 0x1f, 0x0a, 0x0b, 0x64, 0x62, 0x5f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63,
-	0x6f, 0x6c, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0a, 0x64, 0x62, 0x50, 0x72, 0x6f, 0x74,
-	0x6f, 0x63, 0x6f, 0x6c, 0x22, 0xc1, 0x01, 0x0a, 0x13, 0x52, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63,
-	0x65, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x12, 0x23, 0x0a, 0x0d,
-	0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x74, 0x79, 0x70, 0x65, 0x18, 0x01, 0x20,
-	0x01, 0x28, 0x09, 0x52, 0x0c, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x54, 0x79, 0x70,
-	0x65, 0x12, 0x27, 0x0a, 0x0f, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x6f, 0x72,
-	0x69, 0x67, 0x69, 0x6e, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0e, 0x72, 0x65, 0x73, 0x6f,
-	0x75, 0x72, 0x63, 0x65, 0x4f, 0x72, 0x69, 0x67, 0x69, 0x6e, 0x12, 0x14, 0x0a, 0x05, 0x63, 0x6c,
-	0x6f, 0x75, 0x64, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x63, 0x6c, 0x6f, 0x75, 0x64,
-	0x12, 0x46, 0x0a, 0x08, 0x64, 0x61, 0x74, 0x61, 0x62, 0x61, 0x73, 0x65, 0x18, 0x04, 0x20, 0x01,
-	0x28, 0x0b, 0x32, 0x2a, 0x2e, 0x70, 0x72, 0x65, 0x68, 0x6f, 0x67, 0x2e, 0x76, 0x31, 0x61, 0x6c,
-	0x70, 0x68, 0x61, 0x2e, 0x44, 0x69, 0x73, 0x63, 0x6f, 0x76, 0x65, 0x72, 0x65, 0x64, 0x44, 0x61,
-	0x74, 0x61, 0x62, 0x61, 0x73, 0x65, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x52, 0x08,
-	0x64, 0x61, 0x74, 0x61, 0x62, 0x61, 0x73, 0x65, 0x22, 0x98, 0x01, 0x0a, 0x16, 0x52, 0x65, 0x73,
+	0x6f, 0x6e, 0x6e, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x54, 0x79, 0x70, 0x65, 0x22, 0xc1, 0x01, 0x0a,
+	0x13, 0x52, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x45,
+	0x76, 0x65, 0x6e, 0x74, 0x12, 0x23, 0x0a, 0x0d, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65,
+	0x5f, 0x74, 0x79, 0x70, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0c, 0x72, 0x65, 0x73,
+	0x6f, 0x75, 0x72, 0x63, 0x65, 0x54, 0x79, 0x70, 0x65, 0x12, 0x27, 0x0a, 0x0f, 0x72, 0x65, 0x73,
+	0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x6f, 0x72, 0x69, 0x67, 0x69, 0x6e, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x0e, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x4f, 0x72, 0x69, 0x67,
+	0x69, 0x6e, 0x12, 0x14, 0x0a, 0x05, 0x63, 0x6c, 0x6f, 0x75, 0x64, 0x18, 0x03, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x05, 0x63, 0x6c, 0x6f, 0x75, 0x64, 0x12, 0x46, 0x0a, 0x08, 0x64, 0x61, 0x74, 0x61,
+	0x62, 0x61, 0x73, 0x65, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x2a, 0x2e, 0x70, 0x72, 0x65,
+	0x68, 0x6f, 0x67, 0x2e, 0x76, 0x31, 0x61, 0x6c, 0x70, 0x68, 0x61, 0x2e, 0x44, 0x69, 0x73, 0x63,
+	0x6f, 0x76, 0x65, 0x72, 0x65, 0x64, 0x44, 0x61, 0x74, 0x61, 0x62, 0x61, 0x73, 0x65, 0x4d, 0x65,
+	0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x52, 0x08, 0x64, 0x61, 0x74, 0x61, 0x62, 0x61, 0x73, 0x65,
+	0x22, 0x56, 0x0a, 0x1a, 0x44, 0x69, 0x73, 0x63, 0x6f, 0x76, 0x65, 0x72, 0x65, 0x64, 0x44, 0x61,
+	0x74, 0x61, 0x62, 0x61, 0x73, 0x65, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x12, 0x17,
+	0x0a, 0x07, 0x64, 0x62, 0x5f, 0x74, 0x79, 0x70, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x06, 0x64, 0x62, 0x54, 0x79, 0x70, 0x65, 0x12, 0x1f, 0x0a, 0x0b, 0x64, 0x62, 0x5f, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0a, 0x64, 0x62,
+	0x50, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x22, 0x98, 0x01, 0x0a, 0x16, 0x52, 0x65, 0x73,
 	0x6f, 0x75, 0x72, 0x63, 0x65, 0x48, 0x65, 0x61, 0x72, 0x74, 0x62, 0x65, 0x61, 0x74, 0x45, 0x76,
 	0x65, 0x6e, 0x74, 0x12, 0x23, 0x0a, 0x0d, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f,
 	0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0c, 0x72, 0x65, 0x73, 0x6f,
@@ -5968,8 +5973,8 @@ var file_prehog_v1alpha_teleport_proto_goTypes = []interface{}{
 	(UIDiscoverDeployServiceEvent_DeployType)(0),              // 7: prehog.v1alpha.UIDiscoverDeployServiceEvent.DeployType
 	(*UserLoginEvent)(nil),                                    // 8: prehog.v1alpha.UserLoginEvent
 	(*SSOCreateEvent)(nil),                                    // 9: prehog.v1alpha.SSOCreateEvent
-	(*DiscoveredDatabaseMetadata)(nil),                        // 10: prehog.v1alpha.DiscoveredDatabaseMetadata
-	(*ResourceCreateEvent)(nil),                               // 11: prehog.v1alpha.ResourceCreateEvent
+	(*ResourceCreateEvent)(nil),                               // 10: prehog.v1alpha.ResourceCreateEvent
+	(*DiscoveredDatabaseMetadata)(nil),                        // 11: prehog.v1alpha.DiscoveredDatabaseMetadata
 	(*ResourceHeartbeatEvent)(nil),                            // 12: prehog.v1alpha.ResourceHeartbeatEvent
 	(*SessionStartEvent)(nil),                                 // 13: prehog.v1alpha.SessionStartEvent
 	(*SessionStartDatabaseMetadata)(nil),                      // 14: prehog.v1alpha.SessionStartDatabaseMetadata
@@ -6027,7 +6032,7 @@ var file_prehog_v1alpha_teleport_proto_goTypes = []interface{}{
 	(*timestamppb.Timestamp)(nil),                             // 66: google.protobuf.Timestamp
 }
 var file_prehog_v1alpha_teleport_proto_depIdxs = []int32{
-	10,  // 0: prehog.v1alpha.ResourceCreateEvent.database:type_name -> prehog.v1alpha.DiscoveredDatabaseMetadata
+	11,  // 0: prehog.v1alpha.ResourceCreateEvent.database:type_name -> prehog.v1alpha.DiscoveredDatabaseMetadata
 	0,   // 1: prehog.v1alpha.ResourceHeartbeatEvent.resource_kind:type_name -> prehog.v1alpha.ResourceKind
 	14,  // 2: prehog.v1alpha.SessionStartEvent.database:type_name -> prehog.v1alpha.SessionStartDatabaseMetadata
 	65,  // 3: prehog.v1alpha.UserCertificateIssuedEvent.ttl:type_name -> google.protobuf.Duration
@@ -6084,7 +6089,7 @@ var file_prehog_v1alpha_teleport_proto_depIdxs = []int32{
 	66,  // 54: prehog.v1alpha.SubmitEventRequest.timestamp:type_name -> google.protobuf.Timestamp
 	8,   // 55: prehog.v1alpha.SubmitEventRequest.user_login:type_name -> prehog.v1alpha.UserLoginEvent
 	9,   // 56: prehog.v1alpha.SubmitEventRequest.sso_create:type_name -> prehog.v1alpha.SSOCreateEvent
-	11,  // 57: prehog.v1alpha.SubmitEventRequest.resource_create:type_name -> prehog.v1alpha.ResourceCreateEvent
+	10,  // 57: prehog.v1alpha.SubmitEventRequest.resource_create:type_name -> prehog.v1alpha.ResourceCreateEvent
 	13,  // 58: prehog.v1alpha.SubmitEventRequest.session_start:type_name -> prehog.v1alpha.SessionStartEvent
 	16,  // 59: prehog.v1alpha.SubmitEventRequest.ui_banner_click:type_name -> prehog.v1alpha.UIBannerClickEvent
 	17,  // 60: prehog.v1alpha.SubmitEventRequest.ui_onboard_complete_go_to_dashboard_click:type_name -> prehog.v1alpha.UIOnboardCompleteGoToDashboardClickEvent
@@ -6173,7 +6178,7 @@ func file_prehog_v1alpha_teleport_proto_init() {
 			}
 		}
 		file_prehog_v1alpha_teleport_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*DiscoveredDatabaseMetadata); i {
+			switch v := v.(*ResourceCreateEvent); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -6185,7 +6190,7 @@ func file_prehog_v1alpha_teleport_proto_init() {
 			}
 		}
 		file_prehog_v1alpha_teleport_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ResourceCreateEvent); i {
+			switch v := v.(*DiscoveredDatabaseMetadata); i {
 			case 0:
 				return &v.state
 			case 1:
