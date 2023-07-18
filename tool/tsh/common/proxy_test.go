@@ -755,7 +755,6 @@ func mustLogin(t *testing.T, s *suite, args ...string) (string, string) {
 		setMockSSOLogin(t, s),
 		setHomePath(tshHome),
 		setKubeConfigPath(kubeConfig),
-		setMockUserHomeDir(tshHome),
 	)
 	require.NoError(t, err)
 	return tshHome, kubeConfig

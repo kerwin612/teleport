@@ -141,9 +141,15 @@ func IsSupported(db tlsca.RouteToDatabase) bool {
 func load(tc *client.TeleportClient, db tlsca.RouteToDatabase) (profile.ConnectProfileFile, error) {
 	switch db.Protocol {
 	case defaults.ProtocolPostgres:
-		return postgres.Load(tc.MockUserHomeDir)
+		if tc.PostgresServiceFilePathOverride != "" {
+			return postgres.LoadFromPath(tc.PostgresServiceFilePathOverride)
+		}
+		return postgres.Load()
 	case defaults.ProtocolMySQL:
-		return mysql.Load(tc.MockUserHomeDir)
+		if tc.MySQLOptionFilePathOverride != "" {
+			return mysql.LoadFromPath(tc.MySQLOptionFilePathOverride)
+		}
+		return mysql.Load()
 	}
 	return nil, trace.BadParameter("unsupported database protocol %q",
 		db.Protocol)

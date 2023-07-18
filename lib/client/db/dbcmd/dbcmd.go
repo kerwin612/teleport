@@ -330,9 +330,13 @@ func (c *CLICommandBuilder) getMySQLOracleCommand() (*exec.Cmd, error) {
 		// We save configuration to ~/.my.cnf, but on Windows that file is not read,
 		// see tables 4.1 and 4.2 on https://dev.mysql.com/doc/refman/8.0/en/option-files.html.
 		// We instruct mysql client to use use that file with --defaults-extra-file.
-		configPath, err := mysql.DefaultConfigPath(c.tc.MockUserHomeDir)
-		if err != nil {
-			return nil, trace.Wrap(err)
+		configPath := c.tc.MySQLOptionFilePathOverride
+		if configPath == "" {
+			var err error
+			configPath, err = mysql.DefaultConfigPath()
+			if err != nil {
+				return nil, trace.Wrap(err)
+			}
 		}
 		extraFile := []string{fmt.Sprintf("--defaults-extra-file=%v", configPath)}
 		args = append(extraFile, args...)

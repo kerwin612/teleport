@@ -3367,9 +3367,16 @@ func setHomePath(path string) CliOption {
 	}
 }
 
-func setMockUserHomeDir(home string) CliOption {
+func setMySQLConfigPathOverride(path string) CliOption {
 	return func(cf *CLIConf) error {
-		cf.MockUserHomeDir = home
+		cf.MySQLOptionFilePathOverride = path
+		return nil
+	}
+}
+
+func setPostgresConfigPathOverride(path string) CliOption {
+	return func(cf *CLIConf) error {
+		cf.PostgresServiceFilePathOverride = path
 		return nil
 	}
 }
