@@ -32,13 +32,13 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	"github.com/gravitational/teleport"
 	"github.com/gravitational/teleport/api/types"
 	apievents "github.com/gravitational/teleport/api/types/events"
 	"github.com/gravitational/teleport/lib/auth"
 	"github.com/gravitational/teleport/lib/cloud"
-	kubeutils "github.com/gravitational/teleport/lib/kube/utils"
 	"github.com/gravitational/teleport/lib/services"
 	"github.com/gravitational/teleport/lib/srv/discovery/common"
 	"github.com/gravitational/teleport/lib/srv/discovery/fetchers"
@@ -50,7 +50,7 @@ var errNoInstances = errors.New("all fetched nodes already enrolled")
 
 // KubernetesClient is an interface for providing client for accessing Kubernetes cluster
 type KubernetesClient interface {
-	GetKubernetesClient(kubeClusterName string) (kubernetes.Interface, error)
+	GetKubernetesClient() (kubernetes.Interface, error)
 }
 
 // Clients is and interface for retrieving clients needed for discovery.
@@ -108,24 +108,16 @@ func newKubeClientGetter() KubernetesClient {
 	return &kubeClientGetter{}
 }
 
-func (k *kubeClientGetter) GetKubernetesClient(kubeClusterName string) (kubernetes.Interface, error) {
-	k.mu.RLock()
-	if k.kubeClient != nil {
-		defer k.mu.RUnlock()
-		return k.kubeClient, nil
-	}
-	k.mu.RUnlock()
-	k.mu.Lock()
-	defer k.mu.Unlock()
+func (k *kubeClientGetter) GetKubernetesClient() (kubernetes.Interface, error) {
 	if k.kubeClient != nil {
 		return k.kubeClient, nil
 	}
 
-	cfg, err := kubeutils.GetKubeConfig("", false, kubeClusterName)
+	cfg, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	client, err := kubernetes.NewForConfig(cfg.Contexts[kubeClusterName])
+	client, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -158,6 +150,13 @@ kubernetes matchers are present.`)
 
 		clients.Clients = cloudClients
 		clients.KubernetesClient = newKubeClientGetter()
+
+		if len(c.KubernetesMatchers) > 0 {
+			_, err = clients.KubernetesClient.GetKubernetesClient()
+			if err != nil {
+				return trace.Wrap(err, "failed to get Kubernetes client")
+			}
+		}
 
 		c.Clients = clients
 	}
@@ -327,7 +326,7 @@ func (s *Server) initAWSWatchers(matchers []types.AWSMatcher) error {
 }
 
 func (s *Server) initKubeAppWatchers(matchers []types.KubernetesMatcher) error {
-	kubeClient, err := s.Clients.GetKubernetesClient(s.DiscoveryGroup)
+	kubeClient, err := s.Clients.GetKubernetesClient()
 	if err != nil {
 		return trace.Wrap(err)
 	}
