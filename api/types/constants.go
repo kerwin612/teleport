@@ -568,15 +568,15 @@ const (
 	// via automatic discovery, to avoid re-running installation commands
 	// on the node.
 	VMIDLabel = TeleportNamespace + "/vm-id"
-	// ProjectIDLabels is used to identify virtual machines by GCP project
+	// ProjectIDLabel is used to identify virtual machines by GCP project
 	// id found via automatic discovery, to avoid re-running
 	// installation commands on the node.
 	ProjectIDLabel = TeleportNamespace + "/project-id"
-	// ProjectIDLabels is used to identify virtual machines by GCP zone
+	// ZoneLabek is used to identify virtual machines by GCP zone
 	// found via automatic discovery, to avoid re-running installation
 	// commands on the node.
 	ZoneLabel = TeleportNamespace + "/zone"
-	// ProjectIDLabels is used to identify virtual machines by GCP VM name
+	// NameLabel is used to identify virtual machines by GCP VM name
 	// found via automatic discovery, to avoid re-running installation
 	// commands on the node.
 	NameLabel = TeleportNamespace + "/name"
