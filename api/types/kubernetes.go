@@ -74,7 +74,8 @@ type KubeCluster interface {
 	IsKubeconfig() bool
 	// Copy returns a copy of this kube cluster resource.
 	Copy() *KubernetesClusterV3
-
+	// GetCloud gets the cloud this kube cluster is running on, or CloudNone if it
+	// isn't running on a cloud provider.
 	GetCloud() string
 }
 
@@ -301,6 +302,8 @@ func (k *KubernetesClusterV3) IsGCP() bool {
 	return !protoKnownFieldsEqual(&k.Spec.GCP, &KubeGCP{})
 }
 
+// GetCloud gets the cloud this kube cluster is running on, or CloudNone if it
+// isn't running on a cloud provider.
 func (k *KubernetesClusterV3) GetCloud() string {
 	switch {
 	case k.IsAzure():
@@ -310,7 +313,7 @@ func (k *KubernetesClusterV3) GetCloud() string {
 	case k.IsGCP():
 		return CloudGCP
 	default:
-		return CloudUnknown
+		return CloudNone
 	}
 }
 

@@ -118,16 +118,19 @@ func (s *Server) onDatabaseCreate(ctx context.Context, resource types.ResourceWi
 	if trace.IsAlreadyExists(err) {
 		return trace.Wrap(s.onDatabaseUpdate(ctx, resource))
 	}
+	if err != nil {
+		return trace.Wrap(err)
+	}
 	s.UsageReporter.AnonymizeAndSubmit(&usagereporter.ResourceCreateEvent{
-		ResourceType:   "db",
-		ResourceOrigin: "cloud",
+		ResourceType:   types.DiscoveredResourceDatabase,
+		ResourceOrigin: types.OriginCloud,
 		Cloud:          database.GetCloud(),
 		Database: &prehogv1alpha.DiscoveredDatabaseMetadata{
 			DbType:     database.GetType(),
 			DbProtocol: database.GetProtocol(),
 		},
 	})
-	return trace.Wrap(err)
+	return nil
 }
 
 func (s *Server) onDatabaseUpdate(ctx context.Context, resource types.ResourceWithLabels) error {

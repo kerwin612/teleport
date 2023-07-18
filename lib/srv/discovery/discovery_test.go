@@ -204,6 +204,7 @@ func TestDiscoveryServer(t *testing.T) {
 					})
 				},
 			},
+			wantEvents: 1,
 		},
 		{
 			name: "nodes present, instance filtered",
@@ -433,6 +434,10 @@ func TestDiscoveryServer(t *testing.T) {
 			if tc.wantEvents > 0 {
 				require.Eventually(t, func() bool {
 					return len(reporter.Events()) == tc.wantEvents
+				}, 100*time.Millisecond, 10*time.Millisecond)
+			} else {
+				require.Never(t, func() bool {
+					return len(reporter.Events()) != 0
 				}, 100*time.Millisecond, 10*time.Millisecond)
 			}
 
@@ -776,6 +781,10 @@ func TestDiscoveryKube(t *testing.T) {
 			if tc.wantEvents > 0 {
 				require.Eventually(t, func() bool {
 					return len(reporter.Events()) == tc.wantEvents
+				}, 100*time.Millisecond, 10*time.Millisecond)
+			} else {
+				require.Never(t, func() bool {
+					return len(reporter.Events()) != 0
 				}, 100*time.Millisecond, 10*time.Millisecond)
 			}
 		})
@@ -1276,6 +1285,10 @@ func TestDiscoveryDatabase(t *testing.T) {
 				require.Eventually(t, func() bool {
 					return len(reporter.Events()) == tc.wantEvents
 				}, 100*time.Millisecond, 10*time.Millisecond)
+			} else {
+				require.Never(t, func() bool {
+					return len(reporter.Events()) != 0
+				}, 100*time.Millisecond, 10*time.Millisecond)
 			}
 		})
 	}
@@ -1585,6 +1598,10 @@ func TestAzureVMDiscovery(t *testing.T) {
 			if tc.wantEvents > 0 {
 				require.Eventually(t, func() bool {
 					return len(reporter.Events()) == tc.wantEvents
+				}, 100*time.Millisecond, 10*time.Millisecond)
+			} else {
+				require.Never(t, func() bool {
+					return len(reporter.Events()) != 0
 				}, 100*time.Millisecond, 10*time.Millisecond)
 			}
 

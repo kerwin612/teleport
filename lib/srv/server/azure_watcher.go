@@ -25,6 +25,7 @@ import (
 	"github.com/gravitational/trace"
 
 	"github.com/gravitational/teleport/api/types"
+	"github.com/gravitational/teleport/api/types/installers"
 	"github.com/gravitational/teleport/lib/cloud"
 	"github.com/gravitational/teleport/lib/cloud/azure"
 	"github.com/gravitational/teleport/lib/services"
@@ -51,14 +52,18 @@ type AzureInstances struct {
 	Instances []*armcompute.VirtualMachine
 }
 
-// Events generates ResourceCreateEvents for these instances.
-func (inst *AzureInstances) Events() []usagereporter.Anonymizable {
+// MakeEvents generates MakeEvents for these instances.
+func (inst *AzureInstances) MakeEvents() []usagereporter.Anonymizable {
+	resourceType := types.DiscoveredResourceNode
+	if inst.ScriptName == installers.InstallerScriptNameAgentless {
+		resourceType = types.DiscoveredResourceAgentlessNode
+	}
 	events := make([]usagereporter.Anonymizable, 0, len(inst.Instances))
 	for i := 0; i < len(inst.Instances); i++ {
 		events = append(events, &usagereporter.ResourceCreateEvent{
-			ResourceType:   "ssh",
-			ResourceOrigin: "cloud",
-			Cloud:          "azure",
+			ResourceType:   resourceType,
+			ResourceOrigin: types.OriginCloud,
+			Cloud:          types.CloudAzure,
 		})
 	}
 	return events

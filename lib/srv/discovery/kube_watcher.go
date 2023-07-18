@@ -112,12 +112,15 @@ func (s *Server) onKubeCreate(ctx context.Context, rwl types.ResourceWithLabels)
 	if trace.IsAlreadyExists(err) {
 		return trace.Wrap(s.onKubeUpdate(ctx, rwl))
 	}
+	if err != nil {
+		return trace.Wrap(err)
+	}
 	s.UsageReporter.AnonymizeAndSubmit(&usagereporter.ResourceCreateEvent{
-		ResourceType:   "k8s",
-		ResourceOrigin: "cloud",
+		ResourceType:   types.DiscoveredResourceKubernetes,
+		ResourceOrigin: types.OriginCloud,
 		Cloud:          kubeCluster.GetCloud(),
 	})
-	return trace.Wrap(err)
+	return nil
 }
 
 func (s *Server) onKubeUpdate(ctx context.Context, rwl types.ResourceWithLabels) error {

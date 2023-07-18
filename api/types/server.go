@@ -95,8 +95,6 @@ type Server interface {
 	GetCloudMetadata() *CloudMetadata
 	// SetCloudMetadata sets the server's cloud metadata.
 	SetCloudMetadata(meta *CloudMetadata)
-
-	GetCloud() string
 }
 
 // NewServer creates an instance of Server.
@@ -486,15 +484,6 @@ func (s *ServerV2) GetCloudMetadata() *CloudMetadata {
 // SetCloudMetadata sets the server's cloud metadata.
 func (s *ServerV2) SetCloudMetadata(meta *CloudMetadata) {
 	s.Spec.CloudMetadata = meta
-}
-
-func (s *ServerV2) GetCloud() string {
-	if meta := s.GetCloudMetadata(); meta != nil {
-		if meta.AWS != nil {
-			return CloudAWS
-		}
-	}
-	return CloudUnknown
 }
 
 // IsAWSConsole returns true if this app is AWS management console.

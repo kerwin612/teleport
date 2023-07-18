@@ -432,7 +432,6 @@ func (s *Server) handleEC2Instances(instances *server.EC2Instances) error {
 		return trace.NotFound("all fetched nodes already enrolled")
 	}
 
-	s.UsageReporter.AnonymizeAndSubmit(instances.Events()...)
 	s.Log.Debugf("Running Teleport installation on these instances: AccountID: %s, Instances: %s",
 		instances.AccountID, genEC2InstancesLogStr(instances.Instances))
 
@@ -444,7 +443,11 @@ func (s *Server) handleEC2Instances(instances *server.EC2Instances) error {
 		Region:       instances.Region,
 		AccountID:    instances.AccountID,
 	}
-	return trace.Wrap(s.ec2Installer.Run(s.ctx, req))
+	if err := s.ec2Installer.Run(s.ctx, req); err != nil {
+		return trace.Wrap(err)
+	}
+	s.UsageReporter.AnonymizeAndSubmit(instances.MakeEvents()...)
+	return nil
 }
 
 func (s *Server) logHandleInstancesErr(err error) {
@@ -592,7 +595,6 @@ func (s *Server) handleAzureInstances(instances *server.AzureInstances) error {
 		return trace.Wrap(errNoInstances)
 	}
 
-	s.UsageReporter.AnonymizeAndSubmit(instances.Events()...)
 	s.Log.Debugf("Running Teleport installation on these virtual machines: SubscriptionID: %s, VMs: %s",
 		instances.SubscriptionID, genAzureInstancesLogStr(instances.Instances),
 	)
@@ -605,7 +607,11 @@ func (s *Server) handleAzureInstances(instances *server.AzureInstances) error {
 		ScriptName:      instances.ScriptName,
 		PublicProxyAddr: instances.PublicProxyAddr,
 	}
-	return trace.Wrap(s.azureInstaller.Run(s.ctx, req))
+	if err := s.azureInstaller.Run(s.ctx, req); err != nil {
+		return trace.Wrap(err)
+	}
+	s.UsageReporter.AnonymizeAndSubmit(instances.MakeEvents()...)
+	return nil
 }
 
 func (s *Server) handleAzureDiscovery() {

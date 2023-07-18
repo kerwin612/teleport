@@ -29,6 +29,7 @@ import (
 
 	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/lib/cloud"
+	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/labels"
 	"github.com/gravitational/teleport/lib/srv/db/common"
 	usagereporter "github.com/gravitational/teleport/lib/usagereporter/teleport"
@@ -125,14 +126,18 @@ func WithPollInterval(interval time.Duration) Option {
 	}
 }
 
-// Events generates ResourceCreateEvents for these instances.
-func (inst *EC2Instances) Events() []usagereporter.Anonymizable {
+// MakeEvents generates ResourceCreateEvents for these instances.
+func (inst *EC2Instances) MakeEvents() []usagereporter.Anonymizable {
+	resourceType := types.DiscoveredResourceNode
+	if inst.DocumentName == defaults.AWSAgentlessInstallerDocument {
+		resourceType = types.DiscoveredResourceAgentlessNode
+	}
 	events := make([]usagereporter.Anonymizable, 0, len(inst.Instances))
 	for i := 0; i < len(inst.Instances); i++ {
 		events = append(events, &usagereporter.ResourceCreateEvent{
-			ResourceType:   "ssh",
-			ResourceOrigin: "cloud",
-			Cloud:          "aws",
+			ResourceType:   resourceType,
+			ResourceOrigin: types.OriginCloud,
+			Cloud:          types.CloudAWS,
 		})
 	}
 	return events
