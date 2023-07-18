@@ -20,12 +20,15 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/pem"
+	"fmt"
+	"strings"
 
 	"github.com/gravitational/trace"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/gravitational/teleport/api/utils/keypaths"
 	"github.com/gravitational/teleport/api/utils/keys"
+	api "github.com/gravitational/teleport/gen/proto/go/teleport/lib/teleterm/v1"
 	"github.com/gravitational/teleport/lib/client"
 	"github.com/gravitational/teleport/lib/kube/kubeconfig"
 	"github.com/gravitational/teleport/lib/srv/alpnproxy"
@@ -208,4 +211,24 @@ func (k *kube) writeKubeconfig(key *keys.PrivateKey, cas map[string]tls.Certific
 		return trace.Wrap(utils.RemoveFileIfExist(k.KubeconfigPath()))
 	})
 	return nil
+}
+
+// TODO
+func (k *kube) CLICommand() (*api.GatewayCLICommand, error) {
+	cmd, err := k.cfg.CLICommandProvider.GetCommand(k)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	cmdString := strings.TrimSpace(
+		fmt.Sprintf("%s %s",
+			strings.Join(cmd.Env, " "),
+			strings.Join(cmd.Args, " ")))
+
+	return &api.GatewayCLICommand{
+		Path:    cmd.Path,
+		Args:    cmd.Args,
+		Env:     cmd.Env,
+		Preview: cmdString,
+	}, nil
 }

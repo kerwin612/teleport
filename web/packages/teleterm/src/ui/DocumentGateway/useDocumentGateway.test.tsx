@@ -23,6 +23,7 @@ import {
 } from 'teleterm/services/tshd/testHelpers';
 import { MockAppContext } from 'teleterm/ui/fixtures/mocks';
 import { DocumentGateway } from 'teleterm/ui/services/workspacesService';
+import { DatabaseUri } from 'teleterm/ui/uri';
 
 import { WorkspaceContextProvider } from '../Documents';
 import { MockAppContextProvider } from '../fixtures/MockAppContextProvider';
@@ -113,7 +114,7 @@ const testSetup = () => {
     uri: '/docs/1',
     kind: 'doc.gateway',
     targetName: gateway.targetName,
-    targetUri: gateway.targetUri,
+    targetUri: gateway.targetUri as DatabaseUri,
     targetUser: gateway.targetUser,
     targetSubresourceName: gateway.targetSubresourceName,
     gatewayUri: gateway.uri,
