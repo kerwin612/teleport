@@ -132,6 +132,8 @@ type Database interface {
 	// SupportsAutoUsers returns true if this database supports automatic
 	// user provisioning.
 	SupportsAutoUsers() bool
+
+	GetCloud() string
 }
 
 // NewDatabaseV3 creates a new database resource.
@@ -477,6 +479,19 @@ func (d *DatabaseV3) IsAWSHosted() bool {
 // Cloud SQL).
 func (d *DatabaseV3) IsCloudHosted() bool {
 	return d.IsAWSHosted() || d.IsCloudSQL() || d.IsAzure()
+}
+
+func (d *DatabaseV3) GetCloud() string {
+	switch {
+	case d.IsAWSHosted():
+		return CloudAWS
+	case d.IsCloudSQL():
+		return CloudGCP
+	case d.IsAzure():
+		return CloudAzure
+	default:
+		return CloudUnknown
+	}
 }
 
 // getAWSType returns the database type.

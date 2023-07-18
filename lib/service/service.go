@@ -1268,6 +1268,8 @@ func (process *TeleportProcess) getInstanceClient() *auth.Client {
 	return process.instanceClient
 }
 
+// SetUsageReporter sets the server's usage reporter. Note that this is only
+// safe to use before server start.
 func (process *TeleportProcess) SetUsageReporter(reporter usagereporter.UsageReporter) {
 	process.Lock()
 	defer process.Unlock()

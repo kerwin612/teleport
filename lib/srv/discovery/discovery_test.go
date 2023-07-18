@@ -24,6 +24,7 @@ import (
 	"io"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -62,6 +63,7 @@ import (
 	libevents "github.com/gravitational/teleport/lib/events"
 	"github.com/gravitational/teleport/lib/services"
 	"github.com/gravitational/teleport/lib/srv/server"
+	usagereporter "github.com/gravitational/teleport/lib/usagereporter/teleport"
 )
 
 type mockSSMClient struct {
@@ -96,6 +98,23 @@ func (me *mockEmitter) EmitAuditEvent(ctx context.Context, event events.AuditEve
 		me.eventHandler(me.t, event, me.server)
 	}
 	return nil
+}
+
+type mockUsageReporter struct {
+	mu     sync.Mutex
+	events []usagereporter.Anonymizable
+}
+
+func (m *mockUsageReporter) AnonymizeAndSubmit(events ...usagereporter.Anonymizable) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.events = append(m.events, events...)
+}
+
+func (m *mockUsageReporter) Events() []usagereporter.Anonymizable {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.events
 }
 
 type mockEC2Client struct {
@@ -139,6 +158,7 @@ func TestDiscoveryServer(t *testing.T) {
 		ssm               *mockSSMClient
 		emitter           *mockEmitter
 		logHandler        func(*testing.T, io.Reader, chan struct{})
+		wantEvents        int
 	}{
 		{
 			name:             "no nodes present, 1 found ",
@@ -284,6 +304,7 @@ func TestDiscoveryServer(t *testing.T) {
 					}
 				}
 			},
+			wantEvents: 1,
 		},
 		{
 			name:              "chunked nodes get 2 log messages",
@@ -316,6 +337,7 @@ func TestDiscoveryServer(t *testing.T) {
 					}
 				}
 			},
+			wantEvents: 58,
 		},
 	}
 
@@ -361,6 +383,7 @@ func TestDiscoveryServer(t *testing.T) {
 			}
 
 			logger := logrus.New()
+			reporter := &mockUsageReporter{}
 			server, err := New(context.Background(), &Config{
 				Clients:     &testClients,
 				AccessPoint: tlsServer.Auth(),
@@ -373,8 +396,9 @@ func TestDiscoveryServer(t *testing.T) {
 						InstallTeleport: true,
 					},
 				}},
-				Emitter: tc.emitter,
-				Log:     logger,
+				Emitter:       tc.emitter,
+				Log:           logger,
+				UsageReporter: reporter,
 			})
 			require.NoError(t, err)
 			tc.emitter.server = server
@@ -403,8 +427,13 @@ func TestDiscoveryServer(t *testing.T) {
 					return
 				case <-done:
 					server.Stop()
-					return
 				}
+			}
+
+			if tc.wantEvents > 0 {
+				require.Eventually(t, func() bool {
+					return len(reporter.Events()) == tc.wantEvents
+				}, 100*time.Millisecond, 10*time.Millisecond)
 			}
 
 			server.Wait()
@@ -428,6 +457,7 @@ func TestDiscoveryKube(t *testing.T) {
 		clustersNotUpdated            []string
 		expectedAssumedRoles          []string
 		expectedExternalIDs           []string
+		wantEvents                    int
 	}{
 		{
 			name:                 "no clusters in auth server, import 2 prod clusters from EKS",
@@ -443,6 +473,7 @@ func TestDiscoveryKube(t *testing.T) {
 				mustConvertEKSToKubeCluster(t, eksMockClusters[0], mainDiscoveryGroup),
 				mustConvertEKSToKubeCluster(t, eksMockClusters[1], mainDiscoveryGroup),
 			},
+			wantEvents: 2,
 		},
 		{
 			name:                 "no clusters in auth server, import 2 prod clusters from EKS with assumed roles",
@@ -473,6 +504,7 @@ func TestDiscoveryKube(t *testing.T) {
 			},
 			expectedAssumedRoles: []string{"arn:aws:iam::123456789012:role/teleport-role", "arn:aws:iam::123456789012:role/teleport-role2"},
 			expectedExternalIDs:  []string{"external-id", "external-id2"},
+			wantEvents:           2,
 		},
 		{
 			name:                 "no clusters in auth server, import 2 stg clusters from EKS",
@@ -488,6 +520,7 @@ func TestDiscoveryKube(t *testing.T) {
 				mustConvertEKSToKubeCluster(t, eksMockClusters[2], mainDiscoveryGroup),
 				mustConvertEKSToKubeCluster(t, eksMockClusters[3], mainDiscoveryGroup),
 			},
+			wantEvents: 2,
 		},
 		{
 			name: "1 cluster in auth server not updated + import 1 prod cluster from EKS",
@@ -506,6 +539,7 @@ func TestDiscoveryKube(t *testing.T) {
 				mustConvertEKSToKubeCluster(t, eksMockClusters[1], mainDiscoveryGroup),
 			},
 			clustersNotUpdated: []string{"eks-cluster1"},
+			wantEvents:         1,
 		},
 		{
 			name: "1 cluster in auth that belongs the same discovery group but has unmatched labels + import 2 prod clusters from EKS",
@@ -524,6 +558,7 @@ func TestDiscoveryKube(t *testing.T) {
 				mustConvertEKSToKubeCluster(t, eksMockClusters[1], mainDiscoveryGroup),
 			},
 			clustersNotUpdated: []string{},
+			wantEvents:         2,
 		},
 		{
 			name: "1 cluster in auth that belongs to a different discovery group + import 2 prod clusters from EKS",
@@ -543,6 +578,7 @@ func TestDiscoveryKube(t *testing.T) {
 				mustConvertEKSToKubeCluster(t, eksMockClusters[1], mainDiscoveryGroup),
 			},
 			clustersNotUpdated: []string{},
+			wantEvents:         2,
 		},
 		{
 			name: "1 cluster in auth that must be updated + import 1 prod clusters from EKS",
@@ -562,6 +598,7 @@ func TestDiscoveryKube(t *testing.T) {
 				mustConvertEKSToKubeCluster(t, eksMockClusters[1], mainDiscoveryGroup),
 			},
 			clustersNotUpdated: []string{},
+			wantEvents:         1,
 		},
 		{
 			name: "2 clusters in auth that matches but one must be updated +  import 2 prod clusters, 1 from EKS and other from AKS",
@@ -593,6 +630,7 @@ func TestDiscoveryKube(t *testing.T) {
 				mustConvertAKSToKubeCluster(t, aksMockClusters["group1"][1], mainDiscoveryGroup),
 			},
 			clustersNotUpdated: []string{"aks-cluster1"},
+			wantEvents:         2,
 		},
 		{
 			name:                 "no clusters in auth server, import 2 prod clusters from GKE",
@@ -609,6 +647,7 @@ func TestDiscoveryKube(t *testing.T) {
 				mustConvertGKEToKubeCluster(t, gkeMockClusters[0], mainDiscoveryGroup),
 				mustConvertGKEToKubeCluster(t, gkeMockClusters[1], mainDiscoveryGroup),
 			},
+			wantEvents: 2,
 		},
 	}
 
@@ -679,6 +718,7 @@ func TestDiscoveryKube(t *testing.T) {
 				}
 			}()
 
+			reporter := &mockUsageReporter{}
 			discServer, err := New(
 				ctx,
 				&Config{
@@ -689,6 +729,7 @@ func TestDiscoveryKube(t *testing.T) {
 					GCPMatchers:    tc.gcpMatchers,
 					Emitter:        authClient,
 					Log:            logger,
+					UsageReporter:  reporter,
 					DiscoveryGroup: mainDiscoveryGroup,
 				})
 
@@ -731,6 +772,12 @@ func TestDiscoveryKube(t *testing.T) {
 
 			require.Equal(t, tc.expectedAssumedRoles, sts.GetAssumedRoleARNs(), "roles incorrectly assumed")
 			require.Equal(t, tc.expectedExternalIDs, sts.GetAssumedRoleExternalIDs(), "external IDs incorrectly assumed")
+
+			if tc.wantEvents > 0 {
+				require.Eventually(t, func() bool {
+					return len(reporter.Events()) == tc.wantEvents
+				}, 100*time.Millisecond, 10*time.Millisecond)
+			}
 		})
 	}
 }
@@ -1025,6 +1072,7 @@ func TestDiscoveryDatabase(t *testing.T) {
 		awsMatchers       []types.AWSMatcher
 		azureMatchers     []types.AzureMatcher
 		expectDatabases   []types.Database
+		wantEvents        int
 	}{
 		{
 			name: "discover AWS database",
@@ -1034,6 +1082,7 @@ func TestDiscoveryDatabase(t *testing.T) {
 				Regions: []string{"us-east-1"},
 			}},
 			expectDatabases: []types.Database{awsRedshiftDB},
+			wantEvents:      1,
 		},
 		{
 			name: "discover AWS database with assumed role",
@@ -1044,6 +1093,7 @@ func TestDiscoveryDatabase(t *testing.T) {
 				AssumeRole: &role,
 			}},
 			expectDatabases: []types.Database{awsRDSDBWithRole},
+			wantEvents:      1,
 		},
 		{
 			name: "discover Azure database",
@@ -1055,6 +1105,7 @@ func TestDiscoveryDatabase(t *testing.T) {
 				Subscriptions:  []string{"sub1"},
 			}},
 			expectDatabases: []types.Database{azRedisDB},
+			wantEvents:      1,
 		},
 		{
 			name: "update existing database",
@@ -1188,6 +1239,7 @@ func TestDiscoveryDatabase(t *testing.T) {
 			}
 
 			waitForReconcile := make(chan struct{})
+			reporter := &mockUsageReporter{}
 			srv, err := New(
 				ctx,
 				&Config{
@@ -1199,6 +1251,7 @@ func TestDiscoveryDatabase(t *testing.T) {
 					onDatabaseReconcile: func() {
 						waitForReconcile <- struct{}{}
 					},
+					UsageReporter:  reporter,
 					DiscoveryGroup: mainDiscoveryGroup,
 				})
 
@@ -1217,6 +1270,12 @@ func TestDiscoveryDatabase(t *testing.T) {
 				))
 			case <-time.After(time.Second):
 				t.Fatal("Didn't receive reconcile event after 1s")
+			}
+
+			if tc.wantEvents > 0 {
+				require.Eventually(t, func() bool {
+					return len(reporter.Events()) == tc.wantEvents
+				}, 100*time.Millisecond, 10*time.Millisecond)
 			}
 		})
 	}
@@ -1322,6 +1381,7 @@ func TestAzureVMDiscovery(t *testing.T) {
 		presentVMs    []types.Server
 		foundAzureVMs []*armcompute.VirtualMachine
 		logHandler    func(*testing.T, io.Reader, chan struct{})
+		wantEvents    int
 	}{
 		{
 			name:       "no nodes present, 1 found",
@@ -1352,6 +1412,7 @@ func TestAzureVMDiscovery(t *testing.T) {
 					}
 				}
 			},
+			wantEvents: 1,
 		},
 		{
 			name: "nodes present, instance filtered",
@@ -1436,6 +1497,7 @@ func TestAzureVMDiscovery(t *testing.T) {
 					}
 				}
 			},
+			wantEvents: 1,
 		},
 	}
 
@@ -1474,6 +1536,7 @@ func TestAzureVMDiscovery(t *testing.T) {
 
 			logger := logrus.New()
 			emitter := &mockEmitter{}
+			reporter := &mockUsageReporter{}
 			server, err := New(context.Background(), &Config{
 				Clients:     &testClients,
 				AccessPoint: tlsServer.Auth(),
@@ -1484,8 +1547,9 @@ func TestAzureVMDiscovery(t *testing.T) {
 					Regions:        []string{"westcentralus"},
 					ResourceTags:   types.Labels{"teleport": {"yes"}},
 				}},
-				Emitter: emitter,
-				Log:     logger,
+				Emitter:       emitter,
+				Log:           logger,
+				UsageReporter: reporter,
 			})
 
 			require.NoError(t, err)
@@ -1515,8 +1579,13 @@ func TestAzureVMDiscovery(t *testing.T) {
 					return
 				case <-done:
 					server.Stop()
-					return
 				}
+			}
+
+			if tc.wantEvents > 0 {
+				require.Eventually(t, func() bool {
+					return len(reporter.Events()) == tc.wantEvents
+				}, 100*time.Millisecond, 10*time.Millisecond)
 			}
 
 			server.Wait()

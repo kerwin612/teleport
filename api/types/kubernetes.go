@@ -74,6 +74,8 @@ type KubeCluster interface {
 	IsKubeconfig() bool
 	// Copy returns a copy of this kube cluster resource.
 	Copy() *KubernetesClusterV3
+
+	GetCloud() string
 }
 
 // NewKubernetesClusterV3FromLegacyCluster creates a new Kubernetes cluster resource
@@ -297,6 +299,19 @@ func (k *KubernetesClusterV3) IsAWS() bool {
 // IsGCP indentifies if the KubeCluster contains GCP details.
 func (k *KubernetesClusterV3) IsGCP() bool {
 	return !protoKnownFieldsEqual(&k.Spec.GCP, &KubeGCP{})
+}
+
+func (k *KubernetesClusterV3) GetCloud() string {
+	switch {
+	case k.IsAzure():
+		return CloudAzure
+	case k.IsAWS():
+		return CloudAWS
+	case k.IsGCP():
+		return CloudGCP
+	default:
+		return CloudUnknown
+	}
 }
 
 // IsKubeconfig identifies if the KubeCluster contains kubeconfig data.

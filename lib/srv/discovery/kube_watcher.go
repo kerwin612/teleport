@@ -25,6 +25,7 @@ import (
 	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/lib/services"
 	"github.com/gravitational/teleport/lib/srv/discovery/common"
+	usagereporter "github.com/gravitational/teleport/lib/usagereporter/teleport"
 )
 
 func (s *Server) startKubeWatchers() error {
@@ -111,6 +112,11 @@ func (s *Server) onKubeCreate(ctx context.Context, rwl types.ResourceWithLabels)
 	if trace.IsAlreadyExists(err) {
 		return trace.Wrap(s.onKubeUpdate(ctx, rwl))
 	}
+	s.UsageReporter.AnonymizeAndSubmit(&usagereporter.ResourceCreateEvent{
+		ResourceType:   "k8s",
+		ResourceOrigin: "cloud",
+		Cloud:          kubeCluster.GetCloud(),
+	})
 	return trace.Wrap(err)
 }
 

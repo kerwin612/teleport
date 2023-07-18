@@ -23,8 +23,10 @@ import (
 	"github.com/gravitational/trace"
 
 	"github.com/gravitational/teleport/api/types"
+	prehogv1alpha "github.com/gravitational/teleport/gen/proto/go/prehog/v1alpha"
 	"github.com/gravitational/teleport/lib/services"
 	"github.com/gravitational/teleport/lib/srv/discovery/common"
+	usagereporter "github.com/gravitational/teleport/lib/usagereporter/teleport"
 )
 
 func (s *Server) startDatabaseWatchers() error {
@@ -116,6 +118,15 @@ func (s *Server) onDatabaseCreate(ctx context.Context, resource types.ResourceWi
 	if trace.IsAlreadyExists(err) {
 		return trace.Wrap(s.onDatabaseUpdate(ctx, resource))
 	}
+	s.UsageReporter.AnonymizeAndSubmit(&usagereporter.ResourceCreateEvent{
+		ResourceType:   "db",
+		ResourceOrigin: "cloud",
+		Cloud:          database.GetCloud(),
+		Database: &prehogv1alpha.DiscoveredDatabaseMetadata{
+			DbType:     database.GetType(),
+			DbProtocol: database.GetProtocol(),
+		},
+	})
 	return trace.Wrap(err)
 }
 
