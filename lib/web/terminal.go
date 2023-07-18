@@ -32,6 +32,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/gorilla/websocket"
 	"github.com/gravitational/trace"
+	"github.com/gravitational/trace/trail"
 	"github.com/jonboulle/clockwork"
 	"github.com/sirupsen/logrus"
 	oteltrace "go.opentelemetry.io/otel/trace"
@@ -47,7 +48,6 @@ import (
 	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/api/utils/keys"
 	"github.com/gravitational/teleport/lib/agentless"
-	"github.com/gravitational/teleport/lib/auth"
 	wanlib "github.com/gravitational/teleport/lib/auth/webauthn"
 	"github.com/gravitational/teleport/lib/client"
 	"github.com/gravitational/teleport/lib/defaults"
@@ -507,12 +507,12 @@ func (t *sshBaseHandler) issueSessionMFACerts(ctx context.Context, tc *client.Te
 				},
 			},
 		}); err != nil {
-		return nil, trace.Wrap(err)
+		return nil, trail.FromGRPC(err)
 	}
 
 	resp, err := stream.Recv()
 	if err != nil {
-		return nil, trace.Wrap(err)
+		return nil, trail.FromGRPC(err)
 	}
 
 	challenge := resp.GetMFAChallenge()
@@ -533,7 +533,7 @@ func (t *sshBaseHandler) issueSessionMFACerts(ctx context.Context, tc *client.Te
 			},
 		})
 		if err != nil {
-			return nil, trace.Wrap(client.MFARequiredUnknown(err))
+			return nil, trace.Wrap(client.MFARequiredUnknown(trail.FromGRPC(err)))
 		}
 
 		if !mfaRequiredResp.Required {
@@ -551,12 +551,12 @@ func (t *sshBaseHandler) issueSessionMFACerts(ctx context.Context, tc *client.Te
 
 	err = stream.Send(&authproto.UserSingleUseCertsRequest{Request: &authproto.UserSingleUseCertsRequest_MFAResponse{MFAResponse: assertion}})
 	if err != nil {
-		return nil, trace.Wrap(err)
+		return nil, trail.FromGRPC(err)
 	}
 
 	resp, err = stream.Recv()
 	if err != nil {
-		return nil, trace.Wrap(err)
+		return nil, trail.FromGRPC(err)
 	}
 
 	certResp := resp.GetCert()
@@ -687,22 +687,7 @@ func (t *sshBaseHandler) connectToHost(ctx context.Context, ws WSConn, tc *clien
 	mfaCancel()
 	directCancel()
 
-	switch {
-	// No MFA errors, return any errors from the direct connection
-	case mfaErr == nil:
-		return nil, trace.Wrap(directErr)
-	// Any direct connection errors other than access denied, which should be returned
-	// if MFA is required, take precedent over MFA errors due to users not having any
-	// enrolled devices.
-	case !trace.IsAccessDenied(directErr) && errors.Is(mfaErr, auth.ErrNoMFADevices):
-		return nil, trace.Wrap(directErr)
-	case !errors.Is(mfaErr, io.EOF) && // Ignore any errors from MFA due to locks being enforced, the direct error will be friendlier
-		!errors.Is(mfaErr, client.MFARequiredUnknownErr{}) && // Ignore any failures that occurred before determining if MFA was required
-		!errors.Is(mfaErr, services.ErrSessionMFANotRequired): // Ignore any errors caused by attempting the MFA ceremony when MFA will not grant access
-		return nil, trace.Wrap(mfaErr)
-	default:
-		return nil, trace.Wrap(directErr)
-	}
+	return nil, client.ChooseConnectionError(directErr, mfaErr, t.ctx.cfg.RootClusterName, tc.SiteName)
 }
 
 // streamTerminal opens a SSH connection to the remote host and streams
@@ -783,7 +768,10 @@ func (t *sshBaseHandler) connectToNode(ctx context.Context, ws WSConn, tc *clien
 		t.sessionData.ServerHostname,
 		tc, modules.GetModules().IsBoringBinary())
 	if err != nil {
-		return nil, trace.NewAggregate(err, conn.Close())
+		// The close error is ignored instead of using [trace.NewAggregate] because
+		// aggregate errors do not allow error inspection with things like [trace.IsAccessDenied].
+		_ = conn.Close()
+		return nil, trace.Wrap(err)
 	}
 
 	clt.ProxyPublicAddr = t.proxyPublicAddr

@@ -1646,21 +1646,36 @@ func (tc *TeleportClient) ConnectToNode(ctx context.Context, clt *ClusterClient,
 	mfaCancel()
 	directCancel()
 
+	rootCluster, err := tc.RootClusterName(ctx)
+	if err != nil {
+		rootCluster = tc.SiteName
+	}
+	return nil, trace.Wrap(ChooseConnectionError(directErr, mfaErr, rootCluster, nodeDetails.Cluster))
+}
+
+// ChooseConnectionError determines which error from connecting to a host simultaneously
+// with and without MFA should be returned to the user.
+func ChooseConnectionError(directErr, mfaErr error, rootCluster, targetCluster string) error {
 	switch {
 	// No MFA errors, return any errors from the direct connection
 	case mfaErr == nil:
-		return nil, trace.Wrap(directErr)
+		return trace.Wrap(directErr)
+	// Any access denied errors from a direct connection to a node in another cluster take
+	// precedence over mfa errors. Since the root cluster is always used for MFA we don't
+	// want to show users misleading errors if they don't have any devices in the root cluster.
+	case trace.IsAccessDenied(directErr) && rootCluster != targetCluster:
+		return trace.Wrap(directErr)
 	// Any direct connection errors other than access denied, which should be returned
 	// if MFA is required, take precedent over MFA errors due to users not having any
 	// enrolled devices.
 	case !trace.IsAccessDenied(directErr) && errors.Is(mfaErr, auth.ErrNoMFADevices):
-		return nil, trace.Wrap(directErr)
+		return trace.Wrap(directErr)
 	case !errors.Is(mfaErr, io.EOF) && // Ignore any errors from MFA due to locks being enforced, the direct error will be friendlier
 		!errors.Is(mfaErr, MFARequiredUnknownErr{}) && // Ignore any failures that occurred before determining if MFA was required
 		!errors.Is(mfaErr, services.ErrSessionMFANotRequired): // Ignore any errors caused by attempting the MFA ceremony when MFA will not grant access
-		return nil, trace.Wrap(mfaErr)
+		return trace.Wrap(mfaErr)
 	default:
-		return nil, trace.Wrap(directErr)
+		return trace.Wrap(directErr)
 	}
 }
 
