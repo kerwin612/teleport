@@ -124,6 +124,10 @@ type RouterConfig struct {
 	// TracerProvider allows tracers to be created
 	TracerProvider oteltrace.TracerProvider
 
+	// PublicAddress is the proxy's Public Address.
+	// Eg, proxy.example.com:3080
+	PublicAddress string
+
 	// serverResolver is used to resolve hosts, used by tests
 	serverResolver serverResolverFn
 }
@@ -146,6 +150,10 @@ func (c *RouterConfig) CheckAndSetDefaults() error {
 		return trace.BadParameter("SiteGetter must be provided")
 	}
 
+	if c.PublicAddress == "" {
+		return trace.BadParameter("PublicAddress must be provided")
+	}
+
 	if c.TracerProvider == nil {
 		c.TracerProvider = tracing.DefaultProvider()
 	}
@@ -160,13 +168,14 @@ func (c *RouterConfig) CheckAndSetDefaults() error {
 // Router is used by the proxy to establish connections to both
 // nodes and other clusters.
 type Router struct {
-	clusterName    string
-	log            *logrus.Entry
-	clusterGetter  RemoteClusterGetter
-	localSite      reversetunnelclient.RemoteSite
-	siteGetter     SiteGetter
-	tracer         oteltrace.Tracer
-	serverResolver serverResolverFn
+	clusterName        string
+	log                *logrus.Entry
+	clusterGetter      RemoteClusterGetter
+	localSite          reversetunnelclient.RemoteSite
+	siteGetter         SiteGetter
+	tracer             oteltrace.Tracer
+	serverResolver     serverResolverFn
+	proxyPublicAddress string
 }
 
 // NewRouter creates and returns a Router that is populated
@@ -182,13 +191,14 @@ func NewRouter(cfg RouterConfig) (*Router, error) {
 	}
 
 	return &Router{
-		clusterName:    cfg.ClusterName,
-		log:            cfg.Log,
-		clusterGetter:  cfg.RemoteClusterGetter,
-		localSite:      localSite,
-		siteGetter:     cfg.SiteGetter,
-		tracer:         cfg.TracerProvider.Tracer("Router"),
-		serverResolver: cfg.serverResolver,
+		clusterName:        cfg.ClusterName,
+		log:                cfg.Log,
+		clusterGetter:      cfg.RemoteClusterGetter,
+		localSite:          localSite,
+		siteGetter:         cfg.SiteGetter,
+		tracer:             cfg.TracerProvider.Tracer("Router"),
+		serverResolver:     cfg.serverResolver,
+		proxyPublicAddress: cfg.PublicAddress,
 	}, nil
 }
 
@@ -234,14 +244,15 @@ func (r *Router) DialHost(ctx context.Context, clientSrcAddr, clientDstAddr net.
 	principals := []string{host}
 
 	var (
-		isAgentlessNode bool
-		serverID        string
-		serverAddr      string
-		proxyIDs        []string
+		serverID            string
+		serverAddr          string
+		proxyIDs            []string
+		isAgentlessNode     bool
+		sshSigner           ssh.Signer
+		destinationListener net.Listener
 	)
 
 	if target != nil {
-		isAgentlessNode = target.GetSubKind() == types.SubKindOpenSSHNode
 		proxyIDs = target.GetProxyIDs()
 		serverID = fmt.Sprintf("%v.%v", target.GetName(), clusterName)
 
@@ -264,6 +275,38 @@ func (r *Router) DialHost(ctx context.Context, clientSrcAddr, clientDstAddr net.
 		}
 
 		targetTeleportVersion = target.GetTeleportVersion()
+
+		// If the node is a registered openssh node don't set agentGetter
+		// so a SSH user agent will not be created when connecting to the remote node.
+		if target.IsOpenSSHNode() {
+			agentGetter = nil
+			isAgentlessNode = true
+
+			// If the node is of SubKindOpenSSHNode, create the signer.
+			//
+			// Creating the ssh.Signer for SubKindOpenSSHEphemeralKeyNode requires the SSH Login User.
+			// SSH Login User is not available at this stage.
+			// So, the ssh.Signer is created later in the process, after the connection was set up and identity was received.
+			if target.GetSubKind() == types.SubKindOpenSSHNode {
+				client, err := r.GetSiteClient(ctx, clusterName)
+				if err != nil {
+					return nil, "", trace.Wrap(err)
+				}
+				sshSigner, err = signer(ctx, client)
+				if err != nil {
+					return nil, "", trace.Wrap(err)
+				}
+			}
+
+			if target.GetSubKind() == types.SubKindOpenSSHEphemeralKeyNode {
+				destinationListener, err = net.Listen("tcp", ":0")
+				if err != nil {
+					return nil, "", trace.Wrap(err)
+				}
+				serverAddr = destinationListener.Addr().String()
+			}
+		}
+
 	} else {
 		if port == "" || port == "0" {
 			port = strconv.Itoa(defaults.SSHServerListenPort)
@@ -273,27 +316,14 @@ func (r *Router) DialHost(ctx context.Context, clientSrcAddr, clientDstAddr net.
 		r.log.Warnf("server lookup failed: using default=%v", serverAddr)
 	}
 
-	// if the node is a registered openssh node, create a signer for auth
-	// and don't set agentGetter so a SSH user agent will not be created
-	// when connecting to the remote node
-	var sshSigner ssh.Signer
-	if isAgentlessNode {
-		client, err := r.GetSiteClient(ctx, clusterName)
-		if err != nil {
-			return nil, "", trace.Wrap(err)
-		}
-		sshSigner, err = signer(ctx, client)
-		if err != nil {
-			return nil, "", trace.Wrap(err)
-		}
-		agentGetter = nil
-	}
-
 	conn, err := site.Dial(reversetunnelclient.DialParams{
 		From:                  clientSrcAddr,
 		To:                    &utils.NetAddr{AddrNetwork: "tcp", Addr: serverAddr},
+		ToListener:            destinationListener,
 		OriginalClientDstAddr: clientDstAddr,
 		GetUserAgent:          agentGetter,
+		IsAgentlessNode:       isAgentlessNode,
+		ProxyPublicAddress:    r.proxyPublicAddress,
 		AgentlessSigner:       sshSigner,
 		Address:               host,
 		Principals:            principals,

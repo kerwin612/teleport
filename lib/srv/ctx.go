@@ -1344,3 +1344,9 @@ func (c *ServerContext) GetExecRequest() (Exec, error) {
 	}
 	return c.execRequest, nil
 }
+
+// IsOpenSSHNode returns whether the daemon on the Server is an OpenSSH instance.
+// This returns true for SubKindOpenSSHNode and SubKindOpenSSHEphemeralKeyNode.
+func (c *ServerContext) IsOpenSSHNode() bool {
+	return c.ServerSubKind == types.SubKindOpenSSHNode || c.ServerSubKind == types.SubKindOpenSSHEphemeralKeyNode
+}

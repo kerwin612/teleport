@@ -4274,6 +4274,8 @@ func (a *Server) UpsertNode(ctx context.Context, server types.Server) (*types.Ke
 	}
 
 	kind := usagereporter.ResourceKindNode
+
+	// TODO(marco): add ResourceKindNodeOpenSSHEphemeralKey for SubKind == types.SubKindOpenSSHEphemeralKeyNode
 	if server.GetSubKind() == types.SubKindOpenSSHNode {
 		kind = usagereporter.ResourceKindNodeOpenSSH
 	}

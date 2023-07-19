@@ -93,7 +93,7 @@ func (h *Handler) awsOIDCClientRequest(ctx context.Context, region string, p htt
 		return nil, trace.BadParameter("integration subkind (%s) mismatch", integration.GetSubKind())
 	}
 
-	issuer, err := h.issuerFromPublicAddr()
+	issuer, err := awsoidc.IssuerFromPublicAddress(h.cfg.PublicProxyAddr)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -244,4 +244,65 @@ func (h *Handler) awsOIDCConfigureDeployServiceIAM(w http.ResponseWriter, r *htt
 	fmt.Fprint(w, script)
 
 	return nil, trace.Wrap(err)
+}
+
+// awsOIDCListEC2 returns a list of EC2 Instances using the ListEC2 action of the AWS OIDC Integration.
+func (h *Handler) awsOIDCListEC2(w http.ResponseWriter, r *http.Request, p httprouter.Params, sctx *SessionContext, site reversetunnelclient.RemoteSite) (any, error) {
+	ctx := r.Context()
+
+	var req ui.AWSOIDCListEC2Request
+	if err := httplib.ReadJSON(r, &req); err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	accessChecker, err := sctx.GetUserAccessChecker()
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	awsClientReq, err := h.awsOIDCClientRequest(r.Context(), req.Region, p, sctx, site)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	listDBsClient, err := awsoidc.NewListEC2Client(ctx, awsClientReq)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	resp, err := awsoidc.ListEC2(ctx,
+		listDBsClient,
+		awsoidc.ListEC2Request{
+			Integration: awsClientReq.IntegrationName,
+			Region:      req.Region,
+			NextToken:   req.NextToken,
+		},
+	)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	if r.URL.Query().Has("save") {
+		clt, err := sctx.GetUserClient(ctx, site)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		for _, s := range resp.Servers {
+			log.Printf("Upsert Server=%q AWS=%+v", s.GetName(), s.GetCloudMetadata().AWS)
+			_, err := clt.UpsertNode(ctx, s)
+			if err != nil {
+				return nil, trace.Wrap(err)
+			}
+		}
+	}
+
+	servers, err := ui.MakeServers(h.auth.clusterName, resp.Servers, accessChecker)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	return ui.AWSOIDCListEC2Response{
+		NextToken: resp.NextToken,
+		Servers:   servers,
+	}, nil
 }

@@ -14,11 +14,6 @@
       "resolved": "github:NixOS/nixpkgs/6cc260cfd60f094500b79e279069b499806bf6d8#bats",
       "version": "1.3.0"
     },
-    "clang@11.1.0": {
-      "last_modified": "2023-05-01T16:53:22Z",
-      "resolved": "github:NixOS/nixpkgs/8670e496ffd093b60e74e7fa53526aa5920d09eb#clang",
-      "version": "11.1.0"
-    },
     "gci@0.9.1": {
       "last_modified": "2023-02-28T22:11:13Z",
       "resolved": "github:NixOS/nixpkgs/995edc972ad3a1e291ac22d74b9610821357175f#gci",
@@ -48,6 +43,12 @@
       "last_modified": "2023-05-01T16:53:22Z",
       "resolved": "github:NixOS/nixpkgs/8670e496ffd093b60e74e7fa53526aa5920d09eb#libiconvReal",
       "version": "1.16"
+    },
+    "llvmPackages_14.clangUseLLVM@14.0.6": {
+      "last_modified": "2023-05-07T06:59:10Z",
+      "resolved": "github:NixOS/nixpkgs/eb751d65225ec53de9cf3d88acbf08d275882389#llvmPackages_14.clangUseLLVM",
+      "source": "devbox-search",
+      "version": "14.0.6"
     },
     "nodejs@16.18.1": {
       "last_modified": "2023-01-02T04:31:48Z",
