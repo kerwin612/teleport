@@ -127,18 +127,18 @@ func WithPollInterval(interval time.Duration) Option {
 }
 
 // MakeEvents generates ResourceCreateEvents for these instances.
-func (inst *EC2Instances) MakeEvents() []usagereporter.Anonymizable {
+func (instances *EC2Instances) MakeEvents() map[string]usagereporter.Anonymizable {
 	resourceType := types.DiscoveredResourceNode
-	if inst.DocumentName == defaults.AWSAgentlessInstallerDocument {
+	if instances.DocumentName == defaults.AWSAgentlessInstallerDocument {
 		resourceType = types.DiscoveredResourceAgentlessNode
 	}
-	events := make([]usagereporter.Anonymizable, 0, len(inst.Instances))
-	for i := 0; i < len(inst.Instances); i++ {
-		events = append(events, &usagereporter.ResourceCreateEvent{
+	events := make(map[string]usagereporter.Anonymizable, len(instances.Instances))
+	for _, inst := range instances.Instances {
+		events["aws/"+inst.InstanceID] = &usagereporter.ResourceCreateEvent{
 			ResourceType:   resourceType,
 			ResourceOrigin: types.OriginCloud,
 			Cloud:          types.CloudAWS,
-		})
+		}
 	}
 	return events
 }

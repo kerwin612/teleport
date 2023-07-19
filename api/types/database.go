@@ -132,7 +132,7 @@ type Database interface {
 	// SupportsAutoUsers returns true if this database supports automatic
 	// user provisioning.
 	SupportsAutoUsers() bool
-	// GetCloud gets the cloud this database is running on, or CloudNone if it
+	// GetCloud gets the cloud this database is running on, or an empty string if it
 	// isn't running on a cloud provider.
 	GetCloud() string
 }
@@ -482,7 +482,7 @@ func (d *DatabaseV3) IsCloudHosted() bool {
 	return d.IsAWSHosted() || d.IsCloudSQL() || d.IsAzure()
 }
 
-// GetCloud gets the cloud this database is running on, or CloudNone if it
+// GetCloud gets the cloud this database is running on, or an empty string if it
 // isn't running on a cloud provider.
 func (d *DatabaseV3) GetCloud() string {
 	switch {
@@ -493,7 +493,7 @@ func (d *DatabaseV3) GetCloud() string {
 	case d.IsAzure():
 		return CloudAzure
 	default:
-		return CloudNone
+		return ""
 	}
 }
 

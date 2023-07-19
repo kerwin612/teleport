@@ -611,8 +611,6 @@ const (
 	CloudAzure = "Azure"
 	// CloudGCP identifies that a resource was discovered in GCP.
 	CloudGCP = "GCP"
-	// CloudNone identifies that a resource wasn't discovered on any cloud.
-	CloudNone = "None"
 
 	// DiscoveredResourceNode identifies a discovered SSH node.
 	DiscoveredResourceNode = "node"

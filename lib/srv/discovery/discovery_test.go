@@ -111,10 +111,10 @@ func (m *mockUsageReporter) AnonymizeAndSubmit(events ...usagereporter.Anonymiza
 	m.events = append(m.events, events...)
 }
 
-func (m *mockUsageReporter) Events() []usagereporter.Anonymizable {
+func (m *mockUsageReporter) EventsCount() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.events
+	return len(m.events)
 }
 
 type mockEC2Client struct {
@@ -433,11 +433,11 @@ func TestDiscoveryServer(t *testing.T) {
 
 			if tc.wantEvents > 0 {
 				require.Eventually(t, func() bool {
-					return len(reporter.Events()) == tc.wantEvents
+					return reporter.EventsCount() == tc.wantEvents
 				}, 100*time.Millisecond, 10*time.Millisecond)
 			} else {
 				require.Never(t, func() bool {
-					return len(reporter.Events()) != 0
+					return reporter.EventsCount() != 0
 				}, 100*time.Millisecond, 10*time.Millisecond)
 			}
 
@@ -780,11 +780,11 @@ func TestDiscoveryKube(t *testing.T) {
 
 			if tc.wantEvents > 0 {
 				require.Eventually(t, func() bool {
-					return len(reporter.Events()) == tc.wantEvents
+					return reporter.EventsCount() == tc.wantEvents
 				}, 100*time.Millisecond, 10*time.Millisecond)
 			} else {
 				require.Never(t, func() bool {
-					return len(reporter.Events()) != 0
+					return reporter.EventsCount() != 0
 				}, 100*time.Millisecond, 10*time.Millisecond)
 			}
 		})
@@ -1283,11 +1283,11 @@ func TestDiscoveryDatabase(t *testing.T) {
 
 			if tc.wantEvents > 0 {
 				require.Eventually(t, func() bool {
-					return len(reporter.Events()) == tc.wantEvents
+					return reporter.EventsCount() == tc.wantEvents
 				}, 100*time.Millisecond, 10*time.Millisecond)
 			} else {
 				require.Never(t, func() bool {
-					return len(reporter.Events()) != 0
+					return reporter.EventsCount() != 0
 				}, 100*time.Millisecond, 10*time.Millisecond)
 			}
 		})
@@ -1597,11 +1597,11 @@ func TestAzureVMDiscovery(t *testing.T) {
 
 			if tc.wantEvents > 0 {
 				require.Eventually(t, func() bool {
-					return len(reporter.Events()) == tc.wantEvents
+					return reporter.EventsCount() == tc.wantEvents
 				}, 100*time.Millisecond, 10*time.Millisecond)
 			} else {
 				require.Never(t, func() bool {
-					return len(reporter.Events()) != 0
+					return reporter.EventsCount() != 0
 				}, 100*time.Millisecond, 10*time.Millisecond)
 			}
 
@@ -1660,6 +1660,54 @@ func TestServer_onCreate(t *testing.T) {
 			tt.verify(t, accessPoint)
 		})
 	}
+}
+
+func TestEmitUsageEvents(t *testing.T) {
+	t.Parallel()
+	testClients := cloud.TestCloudClients{
+		AzureVirtualMachines: &mockAzureClient{},
+		AzureRunCommand:      &mockAzureRunCommandClient{},
+	}
+	testAuthServer, err := auth.NewTestAuthServer(auth.TestAuthServerConfig{
+		Dir: t.TempDir(),
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, testAuthServer.Close()) })
+
+	tlsServer, err := testAuthServer.NewTestTLSServer()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, tlsServer.Close()) })
+
+	reporter := &mockUsageReporter{}
+	server, err := New(context.Background(), &Config{
+		Clients:     &testClients,
+		AccessPoint: tlsServer.Auth(),
+		AzureMatchers: []types.AzureMatcher{{
+			Types:          []string{"vm"},
+			Subscriptions:  []string{"testsub"},
+			ResourceGroups: []string{"testrg"},
+			Regions:        []string{"westcentralus"},
+			ResourceTags:   types.Labels{"teleport": {"yes"}},
+		}},
+		Emitter:       &mockEmitter{},
+		UsageReporter: reporter,
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, 0, reporter.EventsCount())
+	// Check that events are emitted for new instances.
+	event := &usagereporter.ResourceCreateEvent{}
+	server.emitUsageEvents(map[string]usagereporter.Anonymizable{
+		"inst1": event,
+		"inst2": event,
+	})
+	require.Equal(t, 2, reporter.EventsCount())
+	// Check that events for duplicate instances are discarded.
+	server.emitUsageEvents(map[string]usagereporter.Anonymizable{
+		"inst1": event,
+		"inst3": event,
+	})
+	require.Equal(t, 3, reporter.EventsCount())
 }
 
 type fakeAccessPoint struct {

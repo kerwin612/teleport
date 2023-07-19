@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v3"
@@ -143,6 +144,11 @@ type Server struct {
 	// reconciler periodically reconciles the labels of discovered instances
 	// with the auth server.
 	reconciler *labelReconciler
+
+	mu sync.Mutex
+	// usageEventCache keeps track of which instances the server has emitted
+	// usage events for.
+	usageEventCache map[string]struct{}
 }
 
 // New initializes a discovery Server
@@ -153,9 +159,10 @@ func New(ctx context.Context, cfg *Config) (*Server, error) {
 
 	localCtx, cancelfn := context.WithCancel(ctx)
 	s := &Server{
-		Config:   cfg,
-		ctx:      localCtx,
-		cancelfn: cancelfn,
+		Config:          cfg,
+		ctx:             localCtx,
+		cancelfn:        cancelfn,
+		usageEventCache: make(map[string]struct{}),
 	}
 
 	if err := s.initAWSWatchers(cfg.AWSMatchers); err != nil {
@@ -446,7 +453,7 @@ func (s *Server) handleEC2Instances(instances *server.EC2Instances) error {
 	if err := s.ec2Installer.Run(s.ctx, req); err != nil {
 		return trace.Wrap(err)
 	}
-	s.UsageReporter.AnonymizeAndSubmit(instances.MakeEvents()...)
+	s.emitUsageEvents(instances.MakeEvents())
 	return nil
 }
 
@@ -610,7 +617,7 @@ func (s *Server) handleAzureInstances(instances *server.AzureInstances) error {
 	if err := s.azureInstaller.Run(s.ctx, req); err != nil {
 		return trace.Wrap(err)
 	}
-	s.UsageReporter.AnonymizeAndSubmit(instances.MakeEvents()...)
+	s.emitUsageEvents(instances.MakeEvents())
 	return nil
 }
 
@@ -640,6 +647,19 @@ func (s *Server) handleAzureDiscovery() {
 			return
 		}
 	}
+}
+
+func (s *Server) emitUsageEvents(events map[string]usagereporter.Anonymizable) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	eventsToEmit := make([]usagereporter.Anonymizable, 0, len(events))
+	for name, event := range events {
+		if _, exists := s.usageEventCache[name]; !exists {
+			s.usageEventCache[name] = struct{}{}
+			eventsToEmit = append(eventsToEmit, event)
+		}
+	}
+	s.UsageReporter.AnonymizeAndSubmit(eventsToEmit...)
 }
 
 // Start starts the discovery service.

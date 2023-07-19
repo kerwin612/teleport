@@ -53,18 +53,18 @@ type AzureInstances struct {
 }
 
 // MakeEvents generates MakeEvents for these instances.
-func (inst *AzureInstances) MakeEvents() []usagereporter.Anonymizable {
+func (instances *AzureInstances) MakeEvents() map[string]usagereporter.Anonymizable {
 	resourceType := types.DiscoveredResourceNode
-	if inst.ScriptName == installers.InstallerScriptNameAgentless {
+	if instances.ScriptName == installers.InstallerScriptNameAgentless {
 		resourceType = types.DiscoveredResourceAgentlessNode
 	}
-	events := make([]usagereporter.Anonymizable, 0, len(inst.Instances))
-	for i := 0; i < len(inst.Instances); i++ {
-		events = append(events, &usagereporter.ResourceCreateEvent{
+	events := make(map[string]usagereporter.Anonymizable, len(instances.Instances))
+	for _, inst := range instances.Instances {
+		events["azure/"+aws.StringValue(inst.ID)] = &usagereporter.ResourceCreateEvent{
 			ResourceType:   resourceType,
 			ResourceOrigin: types.OriginCloud,
 			Cloud:          types.CloudAzure,
-		})
+		}
 	}
 	return events
 }
