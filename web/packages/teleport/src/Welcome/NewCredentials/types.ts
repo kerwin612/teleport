@@ -41,10 +41,11 @@ export type UseTokenState = {
   privateKeyPolicyEnabled: boolean;
 };
 
-// duplicated from E
+// Note: QuestionnaireProps is duplicated in Enterprise (e-teleport/Welcome/Questionnaire/Questionnaire)
 export type QuestionnaireProps = {
   full: boolean;
   username: string;
+  onboard: boolean;
   onSubmit?: () => void;
 };
 

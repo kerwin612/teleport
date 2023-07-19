@@ -29,6 +29,8 @@ import useAttempt from 'shared/hooks/useAttemptNext';
 
 import { matchPath, useHistory } from 'react-router';
 
+import Dialog from 'design/Dialog';
+
 import { Redirect, Route, Switch } from 'teleport/components/Router';
 import { CatchError } from 'teleport/components/CatchError';
 import cfg from 'teleport/config';
@@ -49,6 +51,8 @@ import { getFirstRouteForCategory } from 'teleport/Navigation/Navigation';
 
 import { NavigationCategory } from 'teleport/Navigation/categories';
 
+import { QuestionnaireProps } from 'teleport/Welcome/NewCredentials';
+
 import { MainContainer } from './MainContainer';
 import { OnboardDiscover } from './OnboardDiscover';
 
@@ -60,6 +64,7 @@ interface MainProps {
   customBanners?: ReactNode[];
   features: TeleportFeature[];
   billingBanners?: ReactNode[];
+  Questionnaire: (props: QuestionnaireProps) => React.ReactElement;
 }
 
 export function Main(props: MainProps) {
@@ -67,6 +72,7 @@ export function Main(props: MainProps) {
   const history = useHistory();
 
   const { attempt, setAttempt, run } = useAttempt('processing');
+  const { Questionnaire } = props;
 
   useEffect(() => {
     if (ctx.storeUser.state) {
@@ -87,6 +93,7 @@ export function Main(props: MainProps) {
   const { alerts, dismissAlert } = useAlerts(props.initialAlerts);
 
   const [showOnboardDiscover, setShowOnboardDiscover] = useState(true);
+  const [showOnboardSurvey, setShowOnboardSurvey] = useState(true);
 
   if (attempt.status === 'failed') {
     return <Failed message={attempt.statusText} />;
@@ -172,6 +179,16 @@ export function Main(props: MainProps) {
       </BannerList>
       {requiresOnboarding && showOnboardDiscover && (
         <OnboardDiscover onClose={handleOnClose} onOnboard={handleOnboard} />
+      )}
+      {Questionnaire && showOnboardSurvey && (
+        <Dialog open={showOnboardSurvey}>
+          <Questionnaire
+            full={true}
+            username={'TODO'}
+            onSubmit={() => setShowOnboardSurvey(false)}
+            onboard={false}
+          />
+        </Dialog>
       )}
     </FeaturesContextProvider>
   );

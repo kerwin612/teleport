@@ -103,7 +103,7 @@ func (f Features) ToProto() *proto.Features {
 		RecoveryCodes:           f.RecoveryCodes,
 		Plugins:                 f.Plugins,
 		AutomaticUpgrades:       f.AutomaticUpgrades,
-		IsUsageBased:            f.IsUsageBasedBilling,
+		IsUsageBased:            true, //f.IsUsageBasedBilling,
 		Assist:                  f.Assist,
 		DeviceTrust: &proto.DeviceTrustFeature{
 			Enabled:           f.DeviceTrust.Enabled,
@@ -165,7 +165,7 @@ func ValidateResource(res types.Resource) error {
 	case types.AuthPreference:
 		switch r.GetSecondFactor() {
 		case constants.SecondFactorOff, constants.SecondFactorOptional:
-			return trace.BadParameter("cannot disable two-factor authentication on Cloud")
+			//return trace.BadParameter("cannot disable two-factor authentication on Cloud")
 		}
 	case types.SessionRecordingConfig:
 		switch r.GetMode() {
