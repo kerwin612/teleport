@@ -51,6 +51,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/gravitational/teleport/api/defaults"
+	"github.com/gravitational/teleport/api/internalutils/stream"
 	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/api/types/events"
 	"github.com/gravitational/teleport/api/utils"
@@ -1531,6 +1532,10 @@ type mockGCPClient struct {
 
 func (m *mockGCPClient) ListInstances(_ context.Context, _, _ string) ([]*gcp.Instance, error) {
 	return m.vms, nil
+}
+
+func (m *mockGCPClient) StreamInstances(_ context.Context, _, _ string) stream.Stream[*gcp.Instance] {
+	return stream.Slice(m.vms)
 }
 
 func (m *mockGCPClient) GetInstance(_ context.Context, _ *gcp.InstanceRequest) (*gcp.Instance, error) {

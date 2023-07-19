@@ -20,12 +20,13 @@ import (
 	"context"
 	"time"
 
+	"github.com/gravitational/trace"
+	"golang.org/x/exp/slices"
+
 	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/lib/cloud"
 	"github.com/gravitational/teleport/lib/cloud/gcp"
 	"github.com/gravitational/teleport/lib/services"
-	"github.com/gravitational/trace"
-	"golang.org/x/exp/slices"
 )
 
 // GCPInstances contains information about discovered GCP virtual machines.
