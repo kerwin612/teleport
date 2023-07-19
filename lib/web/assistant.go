@@ -488,11 +488,7 @@ func runAssistant(h *Handler, w http.ResponseWriter, r *http.Request,
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			promptTokens, completionTokens, err := usedTokens.CountAll(ctx)
-			if err != nil {
-				h.log.WithError(err).Warn("Failed to count used tokens")
-				return
-			}
+			promptTokens, completionTokens := usedTokens.CountAll(ctx)
 
 			// Once we know how many tokens were consumed for prompt+completion,
 			// consume the remaining tokens from the rate limiter bucket.
@@ -514,7 +510,7 @@ func runAssistant(h *Handler, w http.ResponseWriter, r *http.Request,
 					},
 				},
 			}
-			if err := authClient.SubmitUsageEvent(r.Context(), usageEventReq); err != nil {
+			if err := authClient.SubmitUsageEvent(ctx, usageEventReq); err != nil {
 				h.log.WithError(err).Warn("Failed to emit usage event")
 			}
 

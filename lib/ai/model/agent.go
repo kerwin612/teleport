@@ -359,22 +359,19 @@ func parsePlanningOutput(deltas <-chan string) (*AgentAction, *agentFinish, Toke
 
 		if strings.HasPrefix(text, finalResponseHeader) {
 			parts := make(chan string)
-			streamingTokenCounter := NewAsynchronousTokenCounter(text)
+			streamingTokenCounter, err := NewAsynchronousTokenCounter(text)
+			if err != nil {
+				return nil, nil, nil, trace.Wrap(err)
+			}
 			go func() {
 				defer close(parts)
-				defer func() {
-					errCount := streamingTokenCounter.Finish()
-					if errCount != nil {
-						log.WithError(errCount).Error("Failed to count token usage")
-					}
-				}()
 
 				parts <- strings.TrimPrefix(text, finalResponseHeader)
 				for delta := range deltas {
 					parts <- delta
-					errCount := streamingTokenCounter.Add(delta)
+					errCount := streamingTokenCounter.Add()
 					if errCount != nil {
-						log.WithError(errCount).Error("Failed to add streamed completion text to the token counter")
+						log.WithError(errCount).Debug("Failed to add streamed completion text to the token counter")
 					}
 				}
 			}()

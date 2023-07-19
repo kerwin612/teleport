@@ -121,8 +121,7 @@ func TestChat_PromptTokens(t *testing.T) {
 
 			ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 			defer cancel()
-			prompt, completion, err := tokenCount.CountAll(ctx)
-			require.NoError(t, err)
+			prompt, completion := tokenCount.CountAll(ctx)
 			usedTokens := prompt + completion
 			require.Equal(t, tt.want, usedTokens)
 		})
