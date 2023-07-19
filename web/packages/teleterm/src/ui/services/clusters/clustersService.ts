@@ -460,12 +460,6 @@ export class ClustersService extends ImmutableStore<types.ClustersServiceState> 
     return this.getClusters().filter(c => !c.leaf);
   }
 
-  async updateHeadlessAuthenticationState(
-    params: tsh.UpdateHeadlessAuthenticationStateParams
-  ): Promise<void> {
-    return this.client.updateHeadlessAuthenticationState(params);
-  }
-
   async removeClusterKubeConfigs(clusterUri: string): Promise<void> {
     const {
       params: { rootClusterId },

@@ -31,6 +31,7 @@ import { TshdNotificationsService } from 'teleterm/services/tshdNotifications';
 import { UsageService } from 'teleterm/ui/services/usage';
 import { ConfigService } from 'teleterm/services/config';
 import { ConnectMyComputerService } from 'teleterm/ui/services/connectMyComputer';
+import { HeadlessAuthenticationService } from 'teleterm/services/headlessAuthn';
 
 export interface IAppContext {
   clustersService: ClustersService;
@@ -51,6 +52,7 @@ export interface IAppContext {
   usageService: UsageService;
   configService: ConfigService;
   connectMyComputerService: ConnectMyComputerService;
+  headlessAuthenticationService: HeadlessAuthenticationService;
 
   init(): Promise<void>;
 }

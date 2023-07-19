@@ -25,12 +25,12 @@ import { HeadlessAuthenticationState } from 'gen-proto-js/teleport/lib/teleterm/
 import { HeadlessPrompt } from './HeadlessPrompt';
 
 export function HeadlessAuthentication(props: HeadlessAuthenticationProps) {
-  const { clustersService } = useAppContext();
+  const { headlessAuthenticationService } = useAppContext();
 
   function handleHeadlessApprove(): void {
     // TODO prompt webauthn while waiting for updateHeadlessAuthenticationState request, which prompts
     // for webauthn from the tshd daemon.
-    clustersService.updateHeadlessAuthenticationState({
+    headlessAuthenticationService.updateHeadlessAuthenticationState({
       rootClusterURI: props.rootClusterURI,
       headlessAuthenticationID: props.headlessAuthenticationID,
       state: HeadlessAuthenticationState.HEADLESS_AUTHENTICATION_STATE_APPROVED,
@@ -40,7 +40,7 @@ export function HeadlessAuthentication(props: HeadlessAuthenticationProps) {
   }
 
   function handleHeadlessReject(): void {
-    clustersService.updateHeadlessAuthenticationState({
+    headlessAuthenticationService.updateHeadlessAuthenticationState({
       rootClusterURI: props.rootClusterURI,
       headlessAuthenticationID: props.headlessAuthenticationID,
       state: HeadlessAuthenticationState.HEADLESS_AUTHENTICATION_STATE_DENIED,

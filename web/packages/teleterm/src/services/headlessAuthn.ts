@@ -17,11 +17,13 @@
 import { SendPendingHeadlessAuthenticationRequest } from 'teleterm/services/tshdEvents';
 import { MainProcessClient } from 'teleterm/types';
 import { ModalsService } from 'teleterm/ui/services/modals';
+import type * as types from 'teleterm/services/tshd/types';
 
 export class HeadlessAuthenticationService {
   constructor(
     private mainProcessClient: MainProcessClient,
-    private modalsService: ModalsService
+    private modalsService: ModalsService,
+    private tshClient: types.TshClient
   ) {}
 
   sendPendingHeadlessAuthentication(
@@ -34,5 +36,11 @@ export class HeadlessAuthenticationService {
       headlessAuthenticationID: request.headlessAuthenticationId,
       headlessAuthenticationClientIP: request.headlessAuthenticationClientIp,
     });
+  }
+
+  async updateHeadlessAuthenticationState(
+    params: types.UpdateHeadlessAuthenticationStateParams
+  ): Promise<void> {
+    return this.tshClient.updateHeadlessAuthenticationState(params);
   }
 }

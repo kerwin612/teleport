@@ -222,7 +222,7 @@ func (s *Service) ClusterLogout(ctx context.Context, uri string) error {
 		return trace.Wrap(err)
 	}
 
-	if err := s.StopHeadlessWatcher(uri); err != nil {
+	if err := s.StopHeadlessWatcher(uri); err != nil && !trace.IsNotFound(err) {
 		return trace.Wrap(err)
 	}
 
