@@ -1,5 +1,3 @@
-FROM public.ecr.aws/gravitational/teleport-distroless:13.2.2 as teleport
-
 FROM ubuntu:22.04
 
 RUN apt-get update && \
@@ -13,13 +11,12 @@ RUN curl -JLO "https://dl.filippo.io/mkcert/latest?for=linux/amd64" && \
     chmod +x mkcert-v*-linux-amd64 && \
     cp mkcert-v*-linux-amd64 /usr/local/bin/mkcert
 
-RUN mkdir -p /etc/teleport/certs
-
-RUN mkcert -install && \
+RUN mkdir -p /etc/teleport/certs && \
+    mkcert -install && \
     mkcert -cert-file /etc/teleport/certs/tls.crt -key-file /etc/teleport/certs/tls.key localhost \
     "*.localhost" "teleport"
 
-COPY --from=teleport /usr/local/bin/teleport /usr/local/bin/teleport
-COPY --from=teleport /usr/local/bin/tctl /usr/local/bin/tctl
+COPY ./build/teleport /usr/local/bin/teleport
+COPY ./build/tctl /usr/local/bin/tctl
 
 CMD ["/usr/local/bin/teleport", "start", "-c", "/etc/teleport/teleport.yaml"]

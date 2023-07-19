@@ -1,3 +1,4 @@
+.PHONY: test clean stop build
 test:
 	docker compose up --abort-on-container-exit --exit-code-from e2e
 

@@ -1,9 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
-  // await page.goto('https://ubuntu.example.com:3080/');
-  // await page.goto('https://localhost:3080/');
-  await page.goto('https://teleport:3080/');
+  await page.goto('/');
 
   await page.getByPlaceholder('Username').fill('bob');
   await page.getByPlaceholder('Password').fill('secret');

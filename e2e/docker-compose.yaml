@@ -5,8 +5,8 @@ services:
     image: teleport-e2e:latest
     hostname: teleport
     build:
-        context: config
-        dockerfile: Dockerfile
+        context: ..
+        dockerfile: ./e2e/config/Dockerfile
     volumes:
       - teleport-config:/etc/teleport
       - ./config/teleport.yaml:/etc/teleport/teleport.yaml
@@ -35,8 +35,8 @@ services:
   tctl:
     image: teleport-e2e:latest
     build:
-      context: config
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: ./e2e/config/Dockerfile
     environment:
       - TELEPORT_CONFIG_FILE=/etc/teleport/teleport.yaml
     volumes:
