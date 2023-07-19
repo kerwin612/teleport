@@ -1,5 +1,5 @@
-name: Build CentOS 7 Buildbox Assets Images
-run-name: Build CentOS 7 Buildbox Assets Images
+name: E2E Tests
+run-name: E2E Tests
 on:
   # Only allow manual triggers
   workflow_dispatch:
