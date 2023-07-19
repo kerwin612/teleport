@@ -35,6 +35,7 @@ jobs:
         with:
           name: build
           path: ${{ github.workspace }}/build/
+          retention-days: 1
 
   test:
     name: E2E Tests
@@ -47,6 +48,12 @@ jobs:
         with:
           name: build
           path: ${{ github.workspace }}/build/
+
+      - name: Chmod binaries
+        run: |
+          chmod +x build/teleport
+          chmod +x build/tctl
+          chmod +x build/tsh
 
       - name: Build Images
         run: |
