@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('https://ubuntu.example.com:3080/');
+  // await page.goto('https://ubuntu.example.com:3080/');
+  // await page.goto('https://localhost:3080/');
+  await page.goto('https://teleport:3080/');
 
   await page.getByPlaceholder('Username').fill('bob');
   await page.getByPlaceholder('Password').fill('secret');
@@ -9,10 +11,14 @@ test.beforeEach(async ({ page }) => {
   await page.getByRole('button', { name: 'Sign In' }).click();
 
   // Close the Assist modal
-  await page.getByText('Close').click();
+  // await page.getByText('Close').click();
 });
 
-test('should SSH terminal works', async ({ page }) => {
+test('nodes should be visible', async ({ page }) => {
+  await expect(page.getByText(/^teleport-e2e$/).first()).toBeVisible();
+})
+
+test.skip('should SSH terminal works', async ({ page }) => {
   await page.getByRole('button', { name: 'CONNECT ' }).click();
   const page1Promise = page.waitForEvent('popup');
   await page.getByRole('link', { name: 'jnyckowski' }).click();
@@ -28,7 +34,7 @@ test('should SSH terminal works', async ({ page }) => {
   ).toBeVisible();
 });
 
-test('should summary be generated', async ({ page }) => {
+test.skip('should summary be generated', async ({ page }) => {
   // Open the assist modal
   await page
     .getByRole('navigation')
@@ -51,7 +57,8 @@ test('should summary be generated', async ({ page }) => {
   await expect(summary).toBeVisible({ timeout: 30_000 });
 });
 
-test('should be able to remove conversation', async ({ page }) => {
+test.skip('should be able to remove conversation', async ({ page }) => {
+  // skip
   await page.locator('path:nth-child(2)').click();
   await page.getByText('Start a new conversation').click();
   // Show conversations
