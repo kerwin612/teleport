@@ -14,10 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: isbang/compose-action@v1.4.1
-        with:
-          compose-file: "./e2e/docker-compose.yml"
-#          down-flags: "--volumes"
-#          services: |
-#            helloworld2
-#            helloworld3
+      - name: Build Images
+        run: |
+          make -C e2e build
+      - name: Run Tests
+        run: |
+          make -C e2e test
