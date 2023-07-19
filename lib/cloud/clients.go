@@ -485,17 +485,6 @@ func (c *cloudClients) GetGCPInstancesClient(ctx context.Context) (gcp.Instances
 	return c.gcpInstances.GetClient(ctx)
 }
 
-// GetGCPInstancesClient returns instances client.
-func (c *cloudClients) GetGCPInstancesClient(ctx context.Context) (gcp.InstancesClient, error) {
-	c.mtx.RLock()
-	if c.gcpInstances != nil {
-		defer c.mtx.RUnlock()
-		return c.gcpInstances, nil
-	}
-	c.mtx.RUnlock()
-	return c.initGCPInstancesClient(ctx)
-}
-
 // GetAzureCredential returns default Azure token credential chain.
 func (c *cloudClients) GetAzureCredential() (azcore.TokenCredential, error) {
 	c.mtx.RLock()

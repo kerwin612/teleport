@@ -1639,9 +1639,10 @@ type GCPMatcher struct {
 	Tags map[string]apiutils.Strings `yaml:"tags,omitempty"`
 	// ProjectIDs are the GCP project ID where the resources are deployed.
 	ProjectIDs []string `yaml:"project_ids,omitempty"`
-
+	// ServiceAccounts are the emails of service accounts attached to VMs.
 	ServiceAccounts []string `yaml:"service_accounts,omitempty"`
-
+	// InstallParams sets the join method when installing on
+	// discovered GCP VMs.
 	InstallParams *InstallParams `yaml:"install,omitempty"`
 }
 

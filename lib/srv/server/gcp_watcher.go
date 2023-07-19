@@ -50,11 +50,11 @@ type GCPInstances struct {
 func NewGCPWatcher(ctx context.Context, matchers []types.GCPMatcher, clients cloud.Clients) (*Watcher, error) {
 	cancelCtx, cancelFn := context.WithCancel(ctx)
 	watcher := Watcher{
-		fetchers:      []Fetcher{},
-		ctx:           cancelCtx,
-		cancel:        cancelFn,
-		fetchInterval: time.Minute,
-		InstancesC:    make(chan Instances),
+		fetchers:     []Fetcher{},
+		ctx:          cancelCtx,
+		cancel:       cancelFn,
+		pollInterval: time.Minute,
+		InstancesC:   make(chan Instances),
 	}
 	client, err := clients.GetGCPInstancesClient(ctx)
 	if err != nil {
