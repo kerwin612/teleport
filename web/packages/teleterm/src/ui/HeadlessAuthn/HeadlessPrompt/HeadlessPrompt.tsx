@@ -14,65 +14,93 @@
  * limitations under the License.
  */
 
-import React from 'react';
-import { Box, Text, Flex, ButtonBorder, ButtonSecondary } from 'design';
-import { DialogContent, DialogHeader } from 'design/Dialog';
+import React, { useState } from 'react';
+import { ButtonIcon, Box, Text, ButtonSecondary } from 'design';
+import Dialog from 'design/Dialog';
+import { DialogContent, DialogHeader, DialogFooter } from 'design/Dialog';
+import { PromptWebauthn } from '../../ClusterConnect/ClusterLogin/FormLogin/PromptWebauthn';
 import * as Icons from 'design/Icon';
 
 export type HeadlessPromptProps = {
   clientIP: string;
   onApprove(): void;
   onReject(): void;
-  onCancel(): void;
+  onAbort(): void;
 };
 
 export function HeadlessPrompt({
   clientIP,
   onApprove,
   onReject,
-  onCancel,
+  onAbort,
 }: HeadlessPromptProps) {
+  const [waitForMfa, setWaitForMfa] = useState(false);
+
   return (
-    <Box p={4}>
-      <DialogHeader>
-        <Text typography="h4">Headless Login Detected</Text>
-      </DialogHeader>
-      <DialogContent mb={2}>
-        <Text>
-          Someone has initiated a command from {clientIP}. If it was not you,
-          click Reject and contact your administrator.
-        </Text>
-        <Box mt="5">
-          <Flex gap={2}>
-            <ButtonBorder
+    <Dialog
+      dialogCss={() => ({
+        maxWidth: '480px',
+        width: '100%',
+        padding: '0',
+      })}
+      disableEscapeKeyDown={false}
+      open={true}
+    >
+      <Box p={4}>
+        <DialogHeader
+          justifyContent="space-between"
+          mb={0}
+          alignItems="baseline"
+        >
+          <Text typography="h4" bold>
+            Headless Login Detected
+          </Text>
+          <ButtonIcon
+            type="button"
+            onClick={onAbort}
+            color="text.slightlyMuted"
+          >
+            <Icons.Close fontSize={5} />
+          </ButtonIcon>
+        </DialogHeader>
+        <DialogContent>
+          <Text typography="body1" color="text.slightlyMuted">
+            Someone has initiated a command from {clientIP}. If it was not you,
+            click Reject and contact your administrator.
+          </Text>
+        </DialogContent>
+        {!waitForMfa && (
+          <DialogFooter>
+            <ButtonSecondary
+              autoFocus
+              mr={3}
+              type="submit"
               onClick={e => {
                 e.preventDefault();
+                setWaitForMfa(true);
                 onApprove();
               }}
             >
-              <Icons.Check fontSize="16px" mr={2} />
               Approve
-            </ButtonBorder>
-            <ButtonBorder
+            </ButtonSecondary>
+            <ButtonSecondary
+              type="button"
               onClick={e => {
                 e.preventDefault();
                 onReject();
               }}
             >
-              <Icons.Cross fontSize="16px" mr={2} />
               Reject
-            </ButtonBorder>
-            <ButtonSecondary
-              type="button"
-              width={80}
-              size="small"
-              onClick={onCancel}
-            >
-              Cancel
             </ButtonSecondary>
-          </Flex>
-        </Box>
-      </DialogContent>
-    </Box>
+          </DialogFooter>
+        )}
+        {waitForMfa && (
+          <DialogContent mb={2}>
+            <Text>Complete MFA verification to approve the Headless Login</Text>
+            <PromptWebauthn prompt={'tap'} onCancel={onAbort} />
+          </DialogContent>
+        )}
+      </Box>
+    </Dialog>
   );
 }

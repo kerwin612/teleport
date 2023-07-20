@@ -139,10 +139,7 @@ function renderDialog(dialog: Dialog, handleClose: () => void) {
           rootClusterURI={dialog.rootClusterURI}
           headlessAuthenticationID={dialog.headlessAuthenticationID}
           clientIP={dialog.headlessAuthenticationClientIP}
-          onCancel={() => {
-            handleClose();
-          }}
-          onSuccess={() => {
+          onClose={() => {
             handleClose();
           }}
         />

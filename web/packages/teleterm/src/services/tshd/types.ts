@@ -230,7 +230,8 @@ export type TshClient = {
   ) => FileTransferListeners;
   reportUsageEvent: (event: ReportUsageEventRequest) => Promise<void>;
   updateHeadlessAuthenticationState: (
-    params: UpdateHeadlessAuthenticationStateParams
+    params: UpdateHeadlessAuthenticationStateParams,
+    abortSignal?: TshAbortSignal
   ) => Promise<void>;
 };
 

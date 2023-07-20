@@ -16,8 +16,6 @@
 
 import React from 'react';
 
-import Dialog from 'design/Dialog';
-
 import { useAppContext } from 'teleterm/ui/appContextProvider';
 import { RootClusterUri } from 'teleterm/ui/uri';
 import { HeadlessAuthenticationState } from 'gen-proto-js/teleport/lib/teleterm/v1/service_pb';
@@ -25,47 +23,41 @@ import { HeadlessAuthenticationState } from 'gen-proto-js/teleport/lib/teleterm/
 import { HeadlessPrompt } from './HeadlessPrompt';
 
 export function HeadlessAuthentication(props: HeadlessAuthenticationProps) {
-  const { headlessAuthenticationService } = useAppContext();
+  const { headlessAuthenticationService, clustersService } = useAppContext();
+  const abortCtrl = clustersService.client.createAbortController();
 
-  function handleHeadlessApprove(): void {
-    // TODO prompt webauthn while waiting for updateHeadlessAuthenticationState request, which prompts
-    // for webauthn from the tshd daemon.
-    headlessAuthenticationService.updateHeadlessAuthenticationState({
-      rootClusterURI: props.rootClusterURI,
-      headlessAuthenticationID: props.headlessAuthenticationID,
-      state: HeadlessAuthenticationState.HEADLESS_AUTHENTICATION_STATE_APPROVED,
-    });
-
-    return props.onSuccess();
+  async function handleHeadlessApprove(): Promise<void> {
+    await headlessAuthenticationService.updateHeadlessAuthenticationState(
+      {
+        rootClusterURI: props.rootClusterURI,
+        headlessAuthenticationID: props.headlessAuthenticationID,
+        state:
+          HeadlessAuthenticationState.HEADLESS_AUTHENTICATION_STATE_APPROVED,
+      },
+      abortCtrl.signal
+    );
+    props.onClose();
   }
 
-  function handleHeadlessReject(): void {
-    headlessAuthenticationService.updateHeadlessAuthenticationState({
-      rootClusterURI: props.rootClusterURI,
-      headlessAuthenticationID: props.headlessAuthenticationID,
-      state: HeadlessAuthenticationState.HEADLESS_AUTHENTICATION_STATE_DENIED,
-    });
-
-    return props.onSuccess();
+  async function handleHeadlessReject(): Promise<void> {
+    await headlessAuthenticationService.updateHeadlessAuthenticationState(
+      {
+        rootClusterURI: props.rootClusterURI,
+        headlessAuthenticationID: props.headlessAuthenticationID,
+        state: HeadlessAuthenticationState.HEADLESS_AUTHENTICATION_STATE_DENIED,
+      },
+      abortCtrl.signal
+    );
+    props.onClose();
   }
 
   return (
-    <Dialog
-      dialogCss={() => ({
-        maxWidth: '480px',
-        width: '100%',
-        padding: '0',
-      })}
-      disableEscapeKeyDown={false}
-      open={true}
-    >
-      <HeadlessPrompt
-        clientIP={props.clientIP}
-        onApprove={handleHeadlessApprove}
-        onReject={handleHeadlessReject}
-        onCancel={props.onCancel}
-      />
-    </Dialog>
+    <HeadlessPrompt
+      clientIP={props.clientIP}
+      onApprove={handleHeadlessApprove}
+      onReject={handleHeadlessReject}
+      onAbort={abortCtrl.abort}
+    />
   );
 }
 
@@ -73,6 +65,5 @@ interface HeadlessAuthenticationProps {
   rootClusterURI: RootClusterUri;
   headlessAuthenticationID: string;
   clientIP: string;
-  onCancel(): void;
-  onSuccess(): void;
+  onClose(): void;
 }

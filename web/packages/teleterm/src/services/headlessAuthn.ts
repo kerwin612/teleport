@@ -17,7 +17,9 @@
 import { SendPendingHeadlessAuthenticationRequest } from 'teleterm/services/tshdEvents';
 import { MainProcessClient } from 'teleterm/types';
 import { ModalsService } from 'teleterm/ui/services/modals';
+
 import type * as types from 'teleterm/services/tshd/types';
+import type * as tsh from 'teleterm/services/tshd/types';
 
 export class HeadlessAuthenticationService {
   constructor(
@@ -28,19 +30,25 @@ export class HeadlessAuthenticationService {
 
   sendPendingHeadlessAuthentication(
     request: SendPendingHeadlessAuthenticationRequest
-  ) {
+  ): Promise<void> {
     this.mainProcessClient.forceFocusWindow();
-    this.modalsService.openImportantDialog({
-      kind: 'headless-authn',
-      rootClusterURI: request.rootClusterUri,
-      headlessAuthenticationID: request.headlessAuthenticationId,
-      headlessAuthenticationClientIP: request.headlessAuthenticationClientIp,
+    return new Promise(resolve => {
+      this.modalsService.openImportantDialog({
+        kind: 'headless-authn',
+        rootClusterURI: request.rootClusterUri,
+        headlessAuthenticationID: request.headlessAuthenticationId,
+        headlessAuthenticationClientIP: request.headlessAuthenticationClientIp,
+        onCancel() {
+          resolve(undefined);
+        },
+      });
     });
   }
 
-  async updateHeadlessAuthenticationState(
-    params: types.UpdateHeadlessAuthenticationStateParams
-  ): Promise<void> {
-    return this.tshClient.updateHeadlessAuthenticationState(params);
+  updateHeadlessAuthenticationState(
+    params: types.UpdateHeadlessAuthenticationStateParams,
+    abortSignal: tsh.TshAbortSignal
+  ): void {
+    this.tshClient.updateHeadlessAuthenticationState(params, abortSignal);
   }
 }
